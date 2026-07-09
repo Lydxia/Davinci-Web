@@ -1,0 +1,2590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Da Vinci Robotics — 开场 · 涵洞衔接(预览)</title>
+<style>
+  @font-face{font-family:"DV Sans";font-weight:900;font-display:swap;
+    src:url("__FONT900__") format("woff2");}
+  @font-face{font-family:"DV Sans";font-weight:700;font-display:swap;
+    src:url("__FONT700__") format("woff2");}
+  :root{
+    --ink:#e9f1fb;--dim:#7e90ab;--faint:#46566e;
+    --cyan:#37e0f2;--blue:#3b82f6;--graphite:#070b12;
+    --line:rgba(120,150,190,.14);--line-bright:rgba(120,160,200,.28);
+    --fd:"DV Sans","Avenir Next","Helvetica Neue",Inter,"PingFang SC","Microsoft YaHei",sans-serif;
+    --fb:"DV Sans",Inter,"Helvetica Neue","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+    --fm:"SF Mono","JetBrains Mono","Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:#03060c;}
+  body{color:var(--ink);font-family:var(--fb);-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+  #c{position:fixed;inset:0;z-index:0;display:block;width:100vw;height:100vh;}
+  /* robot dog: a real DOM image composited into the 3D space, driven by JS */
+  #dog{position:fixed;z-index:2;width:min(32vw,440px);left:82%;top:56%;transform:translate(-50%,-50%);
+    filter:drop-shadow(0 30px 60px rgba(0,0,0,.7));pointer-events:none;will-change:transform,opacity,filter;}
+  @media(max-width:760px){#dog{width:60vw;left:70%;top:56%;opacity:.6;}}
+  #scrim{position:fixed;inset:0;z-index:3;pointer-events:none;
+    background:linear-gradient(180deg,rgba(3,6,12,.6) 0%,transparent 22%,transparent 60%,rgba(3,6,12,.82) 100%);}
+  #grain{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  /* ===== precision-instrument HUD ===== */
+  #hud{position:fixed;inset:0;z-index:6;pointer-events:none;}
+  .hud-grid{position:absolute;inset:0;opacity:.5;
+    background-image:
+      linear-gradient(var(--line) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:clamp(46px,5vw,72px) clamp(46px,5vw,72px);
+    -webkit-mask-image:radial-gradient(130% 100% at 50% 42%,#000 30%,transparent 78%);
+    mask-image:radial-gradient(130% 100% at 50% 42%,#000 30%,transparent 78%);}
+  .hud-frame{position:absolute;inset:clamp(14px,1.6vw,22px);border:1px solid var(--line);border-radius:2px;}
+  .tick{position:absolute;width:11px;height:11px;border:1.5px solid var(--cyan);opacity:.85;}
+  .tick.tl{top:-1px;left:-1px;border-right:0;border-bottom:0;}
+  .tick.tr{top:-1px;right:-1px;border-left:0;border-bottom:0;}
+  .tick.bl{bottom:-1px;left:-1px;border-right:0;border-top:0;}
+  .tick.br{bottom:-1px;right:-1px;border-left:0;border-top:0;}
+  @media(max-width:760px){.hud-grid{background-size:44px 44px;}}
+
+  header{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    padding:22px clamp(20px,4vw,56px);}
+  header img{width:148px;display:block;}
+  nav{display:flex;gap:26px;font-size:13px;letter-spacing:.04em;color:var(--dim);}
+  nav a{color:inherit;text-decoration:none;cursor:pointer;}nav a:hover{color:#fff;}
+header img#logo{cursor:pointer;}
+  .cta{border:1px solid rgba(255,255,255,.28);padding:9px 18px;border-radius:999px;font-size:13px;color:#fff;text-decoration:none;backdrop-filter:blur(8px);transition:.2s;}
+  .cta:hover{background:#fff;color:#06101f;}
+  .lang{margin:0 14px 0 26px;background:none;border:1px solid var(--line-bright);border-radius:999px;
+    padding:8px 14px;cursor:pointer;font-family:var(--fm);font-size:12px;letter-spacing:.08em;
+    color:#cfe0ee;transition:.2s;}
+  .lang:hover{border-color:rgba(55,224,242,.6);color:#fff;}
+  @media(max-width:760px){.lang{margin:0 10px 0 0;}}
+  @media(max-width:760px){nav{display:none;}}
+
+  /* copy layers: pinned, fade in/out by scroll phase via JS (data-driven) */
+  .copy{position:fixed;z-index:10;left:clamp(22px,7vw,120px);max-width:46ch;pointer-events:none;
+    opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1);}
+  .copy.on{opacity:1;transform:none;pointer-events:auto;}
+  .copy.top{top:30vh;} .copy.mid{top:50%;transform:translateY(calc(-50% + 26px));}
+  .copy.mid.on{transform:translateY(-50%);}
+  /* ===== HERO: asymmetric editorial grid ===== */
+  .copy.hero1{top:0;left:0;right:0;bottom:0;width:100%;height:100vh;max-width:none;}
+  .hero-grid{
+    position:absolute;inset:0;
+    display:grid;
+    grid-template-columns:clamp(22px,7vw,120px) minmax(0,1.15fr) 1fr clamp(22px,4vw,72px);
+    /* rows: top flexible push · eyebrow · title · lede · small gap · card · bottom pad.
+       Top row is now the heavier flexible one, so empty space piles up ABOVE the
+       text and drops the whole block into the lower-middle of the viewport. */
+    grid-template-rows:minmax(30vh,1.6fr) auto auto auto minmax(24px,0.7fr) auto 12vh;
+    grid-template-areas:
+      ".  .     .    ."
+      ".  eye   eye  ."
+      ".  title title ."
+      ".  lede  lede ."
+      ".  .     .    ."
+      ".  card  .    ."
+      ".  .     .    .";
+  }
+  .eyebrow.green{grid-area:eye;align-self:end;color:#3fe0c4;display:inline-flex;align-items:center;gap:10px;
+    font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.24em;justify-self:start;margin-bottom:22px;}
+  .eb-tick{width:18px;height:1px;background:#3fe0c4;display:inline-block;box-shadow:0 0 8px #3fe0c4;}
+
+  /* title: break the left-aligned cliché — lead large, trail offset & lighter.
+     Sizes tuned so lead + trail never collide at desktop widths. */
+  .htitle{grid-area:title;align-self:start;margin:0;display:flex;flex-direction:column;line-height:.92;}
+  .t-lead{font-family:var(--fd);font-weight:900;font-size:clamp(48px,6.6vw,100px);letter-spacing:-.03em;color:#f3f8ff;}
+  .t-trail{font-family:var(--fd);font-weight:700;font-size:clamp(28px,3.9vw,58px);letter-spacing:.02em;
+    color:#9fb3cf;margin-left:clamp(60px,12vw,220px);margin-top:clamp(18px,2.4vh,40px);}
+  .t-trail::before{content:"";display:inline-block;width:clamp(36px,6vw,96px);height:2px;background:var(--cyan);
+    vertical-align:middle;margin-right:16px;box-shadow:0 0 12px var(--cyan);transform:translateY(-.18em);}
+
+  .lede{grid-area:lede;align-self:start;margin-top:clamp(22px,3vh,40px);font-family:var(--fb);font-weight:400;
+    font-size:clamp(15px,1.25vw,18px);line-height:1.75;color:#aab9d0;text-shadow:0 2px 24px rgba(0,0,0,.7);max-width:44ch;}
+
+  /* rotating capability card — compact, bottom-left grid cell */
+  .cardwrap{grid-area:card;align-self:end;justify-self:start;width:min(440px,86vw);
+    border-top:1px solid var(--line-bright);padding-top:16px;}
+  .card-rail{display:flex;align-items:flex-start;gap:20px;min-height:64px;
+    touch-action:pan-y;cursor:grab;user-select:none;}
+  .card-rail:active{cursor:grabbing;}
+  .card-idx{font-family:var(--fm);display:flex;flex-direction:column;line-height:1.2;padding-top:2px;}
+  .card-idx b{font-size:26px;font-weight:500;color:var(--cyan);}
+  .card-idx i{font-size:11px;color:var(--faint);font-style:normal;letter-spacing:.06em;}
+  .card-body{position:relative;overflow:hidden;flex:1;}
+  .card-title{font-family:var(--fd);font-weight:700;font-size:22px;color:#eaf2ff;letter-spacing:.01em;
+    transition:opacity .45s,transform .45s;}
+  .card-sub{font-family:var(--fb);font-size:12.5px;color:#8a9cb8;letter-spacing:.04em;margin-top:8px;
+    transition:opacity .45s,transform .45s;transition-delay:.05s;}
+  .card-body.swap .card-title,.card-body.swap .card-sub{opacity:0;transform:translateY(10px);}
+  .card-dots{display:flex;gap:8px;margin-top:18px;}
+  .card-dots b{width:22px;height:2px;background:rgba(255,255,255,.16);cursor:pointer;transition:.3s;display:block;}
+  .card-dots b.on{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+
+  @media(max-width:760px){
+    .hero-grid{grid-template-columns:22px 1fr 22px;
+      grid-template-areas:". eye  eye" ". title title" ". lede lede" ". . ." "card card card" ". . .";
+      grid-template-rows:16vh auto auto 1fr auto 16vh;}
+    /* eyebrow right-aligned with the title block, below the logo */
+    .eyebrow.green{grid-column:2;align-self:end;justify-self:end;margin-bottom:6px;font-size:10px;letter-spacing:.16em;}
+    /* whole title+lede block right-aligned, smaller */
+    .htitle{grid-column:2;line-height:.98;align-items:flex-end;text-align:right;}
+    .t-lead{font-size:46px;letter-spacing:-.02em;}
+    .t-trail{font-size:25px;margin-left:0;margin-top:8px;color:#9fb3cf;}
+    .t-trail::before{width:28px;margin-right:10px;}
+    .lede{grid-column:2;font-size:12px;line-height:1.6;margin-top:16px;max-width:none;text-align:right;align-self:start;}
+    /* carousel compact, lifted above the scroll hint */
+    .cardwrap{grid-column:2;width:min(280px,70vw);justify-self:start;padding-top:12px;}
+    .card-rail{gap:13px;min-height:46px;}
+    .card-idx b{font-size:20px;}
+    .card-title{font-size:16px;}
+    .card-sub{font-size:10.5px;}
+  }
+  /* ===== EN type scale: latin copy runs much longer than CJK, so the hero and
+     tunnel-beat display sizes step down when html.en is set ===== */
+  html.en .eyebrow.green{letter-spacing:.14em;}
+  html.en .t-lead{font-size:clamp(34px,4.6vw,68px);letter-spacing:-.02em;}
+  html.en .t-trail{font-size:clamp(20px,2.4vw,36px);margin-left:clamp(40px,8vw,140px);}
+  html.en .ti-h{font-size:clamp(20px,3vw,38px);line-height:1.18;}
+  html.en .st-h{font-size:clamp(26px,3.8vw,54px);}
+  @media(max-width:760px){
+    html.en .t-lead{font-size:30px;}
+    html.en .t-trail{font-size:17px;margin-left:0;}
+    html.en .ti-h{font-size:clamp(16px,4.8vw,24px);}
+    html.en .st-h{font-size:24px;}
+  }
+
+  .eyebrow{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--cyan);margin-bottom:16px;}
+  h1{font-family:var(--fd);font-weight:600;font-size:clamp(44px,7.6vw,108px);line-height:.96;letter-spacing:-.025em;max-width:13ch;text-shadow:0 6px 50px rgba(0,0,0,.6);}
+  h2{font-family:var(--fd);font-weight:600;font-size:clamp(36px,6.4vw,88px);line-height:1.0;letter-spacing:-.02em;text-shadow:0 6px 50px rgba(0,0,0,.6);}
+  .lede{margin-top:22px;font-size:clamp(15px,1.5vw,19px);line-height:1.6;max-width:42ch;color:#cdd9ec;text-shadow:0 2px 24px rgba(0,0,0,.7);}
+  .tagrow{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;}
+  .tag{font-size:12px;letter-spacing:.05em;color:#fff;border:1px solid rgba(255,255,255,.22);padding:7px 14px;border-radius:999px;background:rgba(8,14,26,.4);backdrop-filter:blur(6px);}
+
+  .hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:12;font-size:11px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .4s;}
+  .hint .drop{width:1px;height:34px;background:linear-gradient(var(--cyan),transparent);animation:drop 1.8s infinite;}
+  @keyframes drop{0%{transform:scaleY(0);transform-origin:top;}40%{transform:scaleY(1);transform-origin:top;}60%{transform:scaleY(1);transform-origin:bottom;}100%{transform:scaleY(0);transform-origin:bottom;}}
+
+  /* scroll spacer drives the experience; tall = long cinematic scroll */
+  #spacer{position:relative;z-index:5;height:990vh;}  /* tightened again: shorter map hold + dive */
+
+  /* ===== tunnel-entry intro (three-beat product features w/ line diagrams) ===== */
+  .tunnelintro{position:fixed;z-index:9;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;pointer-events:none;opacity:0;
+    transform-style:preserve-3d;will-change:transform,opacity;perspective:1400px;padding:0 24px;}
+  .ti-eyebrow{font-family:var(--fb);font-weight:600;font-size:11px;letter-spacing:.28em;color:var(--cyan);
+    display:inline-flex;align-items:center;gap:12px;margin-bottom:22px;opacity:.92;}
+  /* stage: stacked cross-fading beats */
+  .ti-stage{position:relative;width:min(760px,92vw);min-height:340px;display:flex;align-items:center;justify-content:center;}
+  .ti-beat{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);opacity:0;
+    display:flex;flex-direction:column;align-items:center;
+    transition:opacity .5s ease;will-change:opacity;}
+  /* enter/leave lift: active beat sits centered; inactive drift down slightly */
+  .ti-beat{transform:translateY(calc(-50% + 22px));}
+  .ti-beat.on{opacity:1;transform:translateY(-50%);transition:opacity .55s ease,transform .7s cubic-bezier(.16,1,.3,1);}
+
+  /* diagram */
+  .ti-diagram{width:min(340px,72vw);margin-bottom:26px;}
+  .dg{width:100%;height:auto;overflow:visible;}
+  .dg [class^="dg-"]{fill:none;}
+  .dg text{fill:#8fa6c4;font-family:var(--fb);font-weight:500;font-size:8.5px;letter-spacing:.06em;text-anchor:middle;}
+  /* base strokes */
+  .dg-route,.dg-profile,.dg-cone,.dg-ring{stroke:var(--cyan);}
+  .dg-ground,.dg-route-curve{stroke:rgba(150,180,210,.28);}
+  .dg-human{stroke:#7d90ad;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-robot{stroke:#eaf3ff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-robot rect{fill:rgba(55,224,242,.10);}
+  .dg-robot-head{fill:var(--cyan);stroke:none;}
+  .dg-node{fill:#0a1420;stroke:var(--cyan);stroke-width:1.5;}
+  .dg-ground{stroke-width:1;stroke-dasharray:1 5;}
+  .dg-profile{stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-route{stroke-width:2;stroke-linecap:round;}
+  .dg-cone{stroke:none;fill:rgba(55,224,242,.06);}
+  .dg-ring{stroke:rgba(55,224,242,.5);stroke-width:1;}
+  .dg-detect rect{stroke:rgba(55,224,242,.55);stroke-width:1.2;fill:rgba(6,14,22,.5);}
+  .dg-tick{stroke:var(--cyan);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+  /* --- diagram animations: run only while the beat is .on --- */
+  /* dashed route draws in */
+  /* timings ~0.6x: the beat section is much shorter now, so每拍小动画同步提速 */
+  .dg-route{stroke-dasharray:120;stroke-dashoffset:120;}
+  .on .dg-route{animation:dgDraw .55s ease forwards;}
+  .dg-route-curve{stroke-dasharray:60;stroke-dashoffset:60;}
+  .on .dg-route-curve{animation:dgDraw .45s ease .18s forwards;}
+  .dg-node{opacity:0;}
+  .on .dg-node{animation:dgPop .25s ease forwards;}
+  .on .dg-nodes .dg-node:nth-child(1){animation-delay:.09s;}
+  .on .dg-nodes .dg-node:nth-child(2){animation-delay:.27s;}
+  .on .dg-nodes .dg-node:nth-child(3){animation-delay:.45s;}
+  .on .dg-nodes .dg-node:nth-child(4){animation-delay:.6s;}
+  .on .dg-nodes .dg-node:nth-child(5){animation-delay:.75s;}
+  /* human fades out */
+  .dg-human{opacity:1;}
+  .on .dg-human{animation:dgFadeOut .45s ease .3s forwards;}
+  /* robot travels the route (beat 1) */
+  .dg-robot{opacity:0;}
+  .dg-handoff .dg-robot{transform:translate(24px,70px);}
+  .on .dg-handoff .dg-robot{animation:dgTravel1 1.2s ease .35s forwards;}
+  /* terrain profile draws + robot walks the profile (beat 2) */
+  .dg-profile{stroke-dasharray:340;stroke-dashoffset:340;}
+  .on .dg-profile{animation:dgDraw .8s ease forwards;}
+  .dg-robot-terrain{opacity:0;}
+  .on .dg-robot-terrain{animation:dgTerrainWalk 1.55s ease .3s forwards;}
+  /* terrain text labels fade in */
+  .dg-terrain-lbls text{opacity:0;}
+  .on .dg-terrain-lbls text{animation:dgFadeIn .35s ease .7s forwards;}
+  /* scan (beat 3) */
+  .dg-robot-scan{opacity:0;}
+  .on .dg-robot-scan{animation:dgFadeIn .35s ease .12s forwards;}
+  .dg-cone{opacity:0;transform-box:fill-box;transform-origin:0% 50%;}
+  .on .dg-cone{animation:dgCone .6s ease .25s forwards;}
+  .dg-ring{opacity:0;stroke-dasharray:200;stroke-dashoffset:200;}
+  .on .dg-ring{animation:dgRing 1.1s linear .25s infinite;}
+  .on .dg-ring-2{animation-delay:.55s;}
+  .dg-detect{opacity:0;}
+  .dg-detect rect{stroke-dasharray:110;stroke-dashoffset:110;}
+  .dg-tick{stroke-dasharray:24;stroke-dashoffset:24;}
+  .on .dg-detect{animation:dgFadeIn .22s ease forwards;}
+  .on .dg-detect rect{animation:dgDraw .35s ease forwards;}
+  .on .dg-detect .dg-tick{animation:dgDraw .28s ease forwards;}
+  .on .dg-detect[data-d="0"]{animation-delay:.55s;}
+  .on .dg-detect[data-d="0"] rect{animation-delay:.55s;}
+  .on .dg-detect[data-d="0"] .dg-tick{animation-delay:.8s;}
+  .on .dg-detect[data-d="1"]{animation-delay:.85s;}
+  .on .dg-detect[data-d="1"] rect{animation-delay:.85s;}
+  .on .dg-detect[data-d="1"] .dg-tick{animation-delay:1.1s;}
+  .on .dg-detect[data-d="2"]{animation-delay:1.15s;}
+  .on .dg-detect[data-d="2"] rect{animation-delay:1.15s;}
+  .on .dg-detect[data-d="2"] .dg-tick{animation-delay:1.4s;}
+
+  @keyframes dgDraw{to{stroke-dashoffset:0;}}
+  @keyframes dgPop{0%{opacity:0;transform:scale(.2);}60%{opacity:1;transform:scale(1.3);}100%{opacity:1;transform:scale(1);}}
+  @keyframes dgFadeOut{to{opacity:.12;}}
+  @keyframes dgFadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes dgTravel1{0%{opacity:0;transform:translate(24px,70px);}12%{opacity:1;}
+    45%{transform:translate(120px,70px);}70%{transform:translate(160px,52px);}100%{opacity:1;transform:translate(296px,52px);}}
+  @keyframes dgTerrainWalk{0%{opacity:0;transform:translate(24px,84px);}10%{opacity:1;}
+    40%{transform:translate(112px,80px);}
+    62%{transform:translate(158px,60px);}
+    80%{transform:translate(184px,44px);}
+    100%{opacity:1;transform:translate(224px,28px);}}
+  @keyframes dgCone{from{opacity:0;transform:scaleX(0);}to{opacity:1;transform:scaleX(1);}}
+  @keyframes dgRing{0%{opacity:0;stroke-dashoffset:200;}30%{opacity:.6;}100%{opacity:0;stroke-dashoffset:0;}}
+
+  /* title */
+  .ti-h{font-family:var(--fd);font-weight:900;font-size:clamp(28px,4.8vw,60px);line-height:1.06;
+    letter-spacing:-.02em;color:#f3f8ff;}
+  .ti-h span{display:inline-block;}
+  .ti-h span+span{margin-left:.3em;}
+  .ti-accent{font-weight:700;color:var(--cyan);text-shadow:0 0 44px rgba(55,224,242,.4);}
+  /* per-character stagger: JS wraps each glyph in .ti-ch */
+  .ti-ch{display:inline-block;opacity:0;transform:translateY(14px);}
+  .ti-beat.on .ti-ch{animation:tiCharIn .4s cubic-bezier(.16,1,.3,1) forwards;}
+  @keyframes tiCharIn{to{opacity:1;transform:none;}}
+
+  .ti-lede{font-family:var(--fb);font-size:clamp(13px,1.4vw,16px);line-height:1.75;color:#aebbd2;
+    margin-top:22px;max-width:52ch;margin-left:auto;margin-right:auto;
+    opacity:0;transform:translateY(10px);}
+  .ti-beat.on .ti-lede{animation:tiCharIn .45s cubic-bezier(.16,1,.3,1) .2s forwards;}
+
+  /* data tags (beat 2 only) */
+  .ti-tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:20px;}
+  .ti-tags b{font-family:var(--fb);font-weight:500;font-size:11.5px;letter-spacing:.02em;color:#bfeefc;
+    border:1px solid rgba(55,224,242,.3);border-radius:2px;padding:5px 11px;background:rgba(6,14,22,.5);
+    opacity:0;transform:translateY(8px);}
+  .ti-beat.on .ti-tags b{animation:tiCharIn .4s cubic-bezier(.16,1,.3,1) forwards;}
+  .ti-beat.on .ti-tags b:nth-child(1){animation-delay:.3s;}
+  .ti-beat.on .ti-tags b:nth-child(2){animation-delay:.38s;}
+  .ti-beat.on .ti-tags b:nth-child(3){animation-delay:.46s;}
+  .ti-beat.on .ti-tags b:nth-child(4){animation-delay:.54s;}
+
+  /* breathing vanishing-point light */
+  .ti-corepoint{position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;
+    transform:translate(-50%,-50%);background:var(--cyan);
+    box-shadow:0 0 24px 6px rgba(55,224,242,.55);animation:tiCoreBreath 3.2s ease-in-out infinite;
+    opacity:.5;z-index:-1;}
+  @keyframes tiCoreBreath{0%,100%{transform:translate(-50%,-50%) scale(.8);opacity:.35;}
+    50%{transform:translate(-50%,-50%) scale(1.5);opacity:.7;}}
+
+  @media(prefers-reduced-motion:reduce){
+    .on [class^="dg-"],.ti-beat.on .ti-ch,.ti-beat.on .ti-lede,.ti-beat.on .ti-tags b,.ti-corepoint{animation:none;}
+    .ti-ch,.ti-lede,.ti-tags b{opacity:1;transform:none;}
+    .dg-route,.dg-profile,.dg-detect rect,.dg-tick{stroke-dashoffset:0;}
+    .dg-node,.dg-robot,.dg-detect,.dg-cone,.dg-ring,.dg-terrain-lbls text{opacity:1;}
+  }
+
+  /* ===== section title ===== */
+  .sectitle{position:fixed;z-index:9;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;pointer-events:none;opacity:0;
+    transform-style:preserve-3d;will-change:transform,opacity;perspective:1400px;}
+  .st-eyebrow{font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.26em;color:#3fe0c4;
+    display:inline-flex;align-items:center;gap:12px;margin-bottom:24px;}
+  /* dead-center now; size stepped down (was 6.4vw/92px) so the centered block
+     reads precise rather than bloated */
+  .st-h{font-family:var(--fd);font-weight:900;font-size:clamp(30px,4.6vw,64px);line-height:1.12;letter-spacing:-.02em;color:#f3f8ff;}
+  .st-h span{display:block;}
+  .st-accent{font-weight:700;color:var(--cyan);text-shadow:0 0 40px rgba(55,224,242,.35);}
+
+  /* ===== PCB connector strokes (map anchor -> PiP link) ===== */
+  .ct-base{fill:none;stroke:rgba(55,224,242,.35);stroke-width:1;
+    stroke-dasharray:640;stroke-dashoffset:640;animation:ctDraw .38s ease forwards;}
+  .ct-flow{fill:none;stroke:var(--cyan);stroke-width:1;
+    stroke-dasharray:2 10;filter:drop-shadow(0 0 3px rgba(55,224,242,.6));
+    animation:flow 1.4s linear infinite;}
+  @keyframes flow{to{stroke-dashoffset:-12;}}
+  @keyframes ctDraw{to{stroke-dashoffset:0;}}
+  .ct-node{fill:var(--cyan);filter:drop-shadow(0 0 3px rgba(55,224,242,.7));}
+  /* ===== scene frames ===== */
+  .sceneframe{position:fixed;z-index:9;top:0;bottom:0;height:100vh;display:flex;gap:34px;align-items:center;
+    opacity:0;pointer-events:none;width:min(840px,86vw);padding-bottom:8vh;
+    transform-style:preserve-3d;will-change:transform,opacity;}
+  .sceneframe.pos-left{left:clamp(22px,7vw,110px);flex-direction:row;}
+  .sceneframe.pos-right{right:clamp(22px,7vw,110px);flex-direction:row-reverse;text-align:right;}
+  .sf-card{position:relative;flex:0 0 clamp(300px,40vw,440px);}
+  .sf-imgwrap{position:relative;overflow:hidden;border:1px solid var(--line-bright);
+    border-radius:3px;aspect-ratio:16/10;background:#0a0f18;
+    box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 0 1px rgba(55,224,242,.08);}
+  .sf-img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.02);}
+  .sf-scan{position:absolute;left:0;right:0;top:0;height:30%;pointer-events:none;
+    background:linear-gradient(180deg,rgba(55,224,242,.18),transparent);
+    animation:scan 3.6s ease-in-out infinite;}
+  @keyframes scan{0%,100%{transform:translateY(0);}50%{transform:translateY(240%);}}
+  .sf-cnr{position:absolute;width:14px;height:14px;border:1.5px solid var(--cyan);opacity:.9;}
+  .sf-cnr.tl{top:8px;left:8px;border-right:0;border-bottom:0;}
+  .sf-cnr.br{bottom:8px;right:8px;border-left:0;border-top:0;}
+  .sf-tag{position:absolute;bottom:10px;left:10px;font-family:var(--fb);font-weight:500;font-size:10.5px;letter-spacing:.08em;
+    color:#bfeefc;background:rgba(6,14,22,.7);border:1px solid rgba(55,224,242,.3);padding:4px 9px;border-radius:2px;}
+  .pos-right .sf-tag{left:auto;right:10px;}
+
+  .sf-info{flex:1;}
+  .sf-idx{font-family:var(--fm);font-size:13px;color:var(--cyan);letter-spacing:.06em;margin-bottom:14px;}
+  .sf-idx i{color:var(--faint);font-style:normal;}
+  .sf-title{font-family:var(--fd);font-weight:900;font-size:clamp(30px,4.4vw,56px);line-height:1.05;letter-spacing:-.02em;color:#f3f8ff;}
+  .sf-rule{width:46px;height:2px;background:var(--cyan);box-shadow:0 0 10px var(--cyan);margin:18px 0;}
+  .pos-right .sf-rule{margin-left:auto;}
+  .sf-desc{font-family:var(--fb);font-size:clamp(14px,1.4vw,17px);line-height:1.7;color:#aebbd2;max-width:42ch;}
+  .pos-right .sf-desc{margin-left:auto;}
+  .sf-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px;}
+  .pos-right .sf-tags{justify-content:flex-end;}
+  .sf-tags b{font-family:var(--fb);font-weight:500;font-size:11.5px;letter-spacing:.03em;color:#cfe0ee;
+    border:1px solid var(--line-bright);padding:6px 12px;border-radius:2px;background:rgba(8,14,26,.4);}
+
+  /* board-1 feature points (replaces tags on video scenes; carries the full
+     per-scenario detail copy from the original site) */
+  .sf-points{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-top:22px;max-width:46ch;}
+  .pos-right .sf-points{margin-left:auto;}
+  .sf-points b{display:block;font-family:var(--fb);font-weight:600;font-size:12.5px;color:#bfeefc;
+    letter-spacing:.04em;margin-bottom:4px;}
+  .sf-points b::before{content:"";display:inline-block;width:5px;height:5px;border:1px solid var(--cyan);
+    margin-right:8px;transform:translateY(-1px) rotate(45deg);}
+  .sf-points span{font-family:var(--fb);font-size:12px;line-height:1.55;color:#8a9cb8;display:block;}
+  video.sf-img{background:#0a0f18;}
+
+  /* ===== "更多巡检场景" matrix — now opened by its map anchor ===== */
+  .solgrid{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:0 24px;opacity:0;pointer-events:none;
+    transform:scale(.97);transition:opacity .35s ease,transform .5s cubic-bezier(.16,1,.3,1);}
+  .solgrid.on{opacity:1;pointer-events:auto;transform:none;}
+  .sg-x{background:none;border:1px solid var(--line-bright);border-radius:2px;color:#cfe0ee;
+    font-family:var(--fm);font-size:13px;line-height:1;padding:5px 10px;cursor:pointer;margin-left:14px;transition:.2s;}
+  .sg-x:hover{border-color:rgba(55,224,242,.6);color:#fff;}
+  .sg-eyebrow{font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.26em;color:#3fe0c4;
+    display:inline-flex;align-items:center;gap:12px;margin-bottom:30px;}
+  .sg-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(14px,1.6vw,22px);
+    width:min(1140px,94vw);text-align:left;}
+  .sg-card{position:relative;display:flex;gap:16px;align-items:stretch;
+    border:1px solid var(--line-bright);border-radius:3px;background:rgba(8,14,24,.6);
+    padding:14px;backdrop-filter:blur(4px);}
+  .sg-imgwrap{position:relative;flex:0 0 38%;overflow:hidden;border-radius:2px;
+    border:1px solid rgba(55,224,242,.16);}
+  .sg-imgwrap img{width:100%;height:100%;object-fit:cover;display:block;min-height:132px;}
+  .sg-idx{position:absolute;top:8px;right:12px;font-family:var(--fm);font-size:11px;color:var(--cyan);
+    letter-spacing:.06em;opacity:.85;}
+  .sg-info{flex:1;min-width:0;padding:2px 4px 2px 0;display:flex;flex-direction:column;}
+  .sg-title{font-family:var(--fd);font-weight:700;font-size:19px;color:#eef5ff;letter-spacing:.01em;margin-bottom:8px;}
+  .sg-desc{font-family:var(--fb);font-size:13.5px;line-height:1.65;color:#93a4bd;}
+  .sg-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px;}
+  .sg-tags b{font-family:var(--fb);font-weight:500;font-size:12px;letter-spacing:.03em;color:#bfeefc;
+    border:1px solid rgba(55,224,242,.28);padding:4px 10px;border-radius:2px;background:rgba(6,14,22,.5);}
+  .sg-cnr{position:absolute;width:12px;height:12px;border:1.5px solid var(--cyan);opacity:.8;}
+  .sg-cnr.tl{top:-1px;left:-1px;border-right:0;border-bottom:0;}
+  .sg-cnr.br{bottom:-1px;right:-1px;border-left:0;border-top:0;}
+
+  /* ============ interactive FIELD MAP (section-3 theme backdrop) ============ */
+  .fieldmap{position:fixed;inset:0;z-index:9;opacity:0;pointer-events:none;}
+  .fieldmap.live{pointer-events:auto;}
+  /* graphite backing that still lets the tunnel glow breathe through the middle */
+  .fieldmap::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(90% 80% at 50% 46%,rgba(4,8,14,.6) 0%,rgba(4,7,13,.9) 76%,rgba(3,6,11,.96) 100%);}
+  /* tunnel-exit pull-up: the stage starts zoomed-in (ground level) and scales
+     back to the full aerial plan as you scroll out of the tunnel */
+  .mp-stage{position:absolute;inset:0;will-change:transform;transform-origin:50% 46%;}
+  #mpSvg{position:absolute;inset:0;width:100%;height:100%;}
+  /* map linework */
+  .mp-contour path{fill:none;stroke:rgba(120,160,200,.10);stroke-width:1;}
+  .mp-contour path.idx{stroke:rgba(120,170,230,.20);}   /* index contour 计曲线 */
+  /* engineering-drawing layer */
+  .mp-bound{fill:none;stroke:rgba(120,170,230,.26);stroke-width:1;stroke-dasharray:16 5 3 5;}
+  .mp-cross{fill:none;stroke:rgba(120,150,190,.35);stroke-width:1;}
+  .mp-diml{fill:none;stroke:#54687f;stroke-width:1;}
+  .mp-arr{fill:#54687f;stroke:none;}
+  .mp-dim{fill:#6e84a0;font-family:var(--fm);font-size:9.5px;text-anchor:middle;letter-spacing:.04em;}
+  .mp-road path{fill:none;stroke:rgba(120,150,190,.15);stroke-width:1;}
+  .mp-zone rect,.mp-zone circle,.mp-zone path{fill:rgba(55,224,242,.045);stroke:rgba(55,224,242,.34);stroke-width:1;}
+  .mp-pond{fill:rgba(59,130,246,.09) !important;stroke:rgba(120,170,230,.4) !important;}
+  .mp-culvert{fill:none !important;stroke:rgba(55,224,242,.5) !important;stroke-dasharray:4 4;}
+  .mp-stalls{fill:none !important;stroke:rgba(55,224,242,.15) !important;}
+  .mp-route{fill:none;stroke:rgba(55,224,242,.42);stroke-width:1.2;stroke-dasharray:3 7;
+    animation:mpFlow 2.6s linear infinite;filter:drop-shadow(0 0 4px rgba(55,224,242,.3));}
+  @keyframes mpFlow{to{stroke-dashoffset:-40;}}
+  .mp-bot{fill:#bfeefc;filter:drop-shadow(0 0 6px rgba(55,224,242,.9));}
+  .mp-lbl{fill:#8fa6c4;font-family:var(--fb);font-weight:500;font-size:12.5px;letter-spacing:.08em;}
+  .mp-tick{fill:#46566e;font-family:var(--fm);font-size:9px;letter-spacing:.05em;}
+  .mp-north path{fill:rgba(55,224,242,.5);stroke:none;}
+  .mp-north text{fill:#5d7290;font-family:var(--fm);font-size:9px;}
+
+  /* anchors */
+  .mpa{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:10px;
+    background:none;border:0;padding:6px;cursor:pointer;z-index:2;font-family:var(--fb);
+    transition:opacity .5s ease,transform .6s cubic-bezier(.16,1,.3,1);}
+  /* destinations reveal after the pull-up settles (staggered via inline delay) */
+  .fieldmap:not(.arrived) .mpa{opacity:0;transform:translate(-50%,-42%);}
+  .mpa-dot{position:relative;width:12px;height:12px;flex:none;}
+  .mpa-dot::before{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 10px rgba(55,224,242,.9);}
+  .mpa-dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(55,224,242,.55);
+    animation:mpaPulse 2.4s ease-out infinite;}
+  @keyframes mpaPulse{0%{transform:scale(.5);opacity:1;}70%,100%{transform:scale(1.9);opacity:0;}}
+  .mpa b{display:flex;align-items:baseline;gap:9px;font-weight:600;font-size:14.5px;color:#dfeaf8;letter-spacing:.03em;
+    background:rgba(6,12,20,.78);border:1px solid var(--line-bright);border-radius:2px;padding:9px 14px;
+    white-space:nowrap;transition:border-color .25s,color .25s;}
+  .mpa b i{font-family:var(--fm);font-style:normal;font-size:12px;color:var(--cyan);}
+  .mpa:hover b,.mpa.sel b{border-color:rgba(55,224,242,.65);color:#fff;}
+  .mpa.flip{flex-direction:row-reverse;}
+  .mpa-more .mpa-dot::before{background:none;border:1.4px dashed var(--cyan);inset:1px;box-shadow:0 0 8px rgba(55,224,242,.5);}
+  .mpa-hint{position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;
+    font-family:var(--fb);font-size:10.5px;color:var(--cyan);letter-spacing:.06em;opacity:.9;
+    animation:hintBob 1.8s ease-in-out infinite;}
+  @keyframes hintBob{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,4px);}}
+
+  /* corners: sheet name bottom-left, invitation line bottom-right — one line
+     each so neither collides with the plan */
+  .mp-legend{position:absolute;bottom:24px;left:clamp(24px,5vw,64px);z-index:1;}
+  .mp-eyebrow{font-family:var(--fb);font-weight:600;font-size:11.5px;letter-spacing:.26em;color:#3fe0c4;
+    display:inline-flex;align-items:center;gap:10px;}
+  .mp-cta{position:absolute;bottom:24px;right:clamp(24px,4vw,56px);z-index:1;text-align:right;
+    font-family:var(--fb);font-size:14px;color:#aab9d0;letter-spacing:.02em;}
+
+  .mp-chips{display:none;}
+
+  /* scrim while a PiP / matrix is open */
+  .mp-scrim{position:absolute;inset:0;background:rgba(3,6,12,.42);opacity:0;pointer-events:none;transition:opacity .35s;z-index:3;}
+  .fieldmap.open .mp-scrim{opacity:1;pointer-events:auto;}
+  #mlink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:4;}
+
+  /* part-3 -> part-4 dive: overlays get out of the way while the camera plunges
+     into the frozen patrol dot */
+  .fieldmap.diving .mpa,.fieldmap.diving .mp-legend,.fieldmap.diving .mp-cta{
+    opacity:0 !important;transition:opacity .25s ease 0s !important;}
+  .fieldmap.diving .mp-bot{filter:drop-shadow(0 0 12px rgba(191,238,252,1));}
+
+  /* ===== PiP panel (linked out of a clicked anchor) ===== */
+  .pip{position:absolute;top:50%;right:clamp(24px,6vw,96px);transform:translateY(-50%) scale(.985);
+    width:min(560px,94vw);z-index:5;background:rgba(7,11,19,.93);border:1px solid var(--line-bright);
+    border-radius:3px;padding:18px 20px 22px;opacity:0;pointer-events:none;
+    clip-path:inset(0 0 100% 0);
+    transition:opacity .3s ease .08s,transform .5s cubic-bezier(.16,1,.3,1) .08s,clip-path .45s cubic-bezier(.16,1,.3,1) .08s;}
+  .pip.left{right:auto;left:clamp(24px,6vw,96px);}
+  .pip.on{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1);clip-path:inset(0 0 0 0);}
+  .pip-cnr{position:absolute;width:13px;height:13px;border:1.5px solid var(--cyan);opacity:.85;}
+  .pip-cnr.tl{top:-1px;left:-1px;border-right:0;border-bottom:0;}
+  .pip-cnr.br{bottom:-1px;right:-1px;border-left:0;border-top:0;}
+  .pip-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .pip-idx{font-family:var(--fm);font-size:13px;color:var(--cyan);letter-spacing:.06em;}
+  .pip-area{font-family:var(--fb);font-weight:500;font-size:12px;color:var(--dim);letter-spacing:.08em;}
+  .pip-x{margin-left:auto;background:none;border:1px solid var(--line-bright);border-radius:2px;color:#cfe0ee;
+    font-family:var(--fm);font-size:13px;line-height:1;padding:5px 10px;cursor:pointer;transition:.2s;}
+  .pip-x:hover{border-color:rgba(55,224,242,.6);color:#fff;}
+  .pip .sf-imgwrap{aspect-ratio:16/9;}
+  .pip-title{font-family:var(--fd);font-weight:900;font-size:28px;letter-spacing:-.01em;color:#f3f8ff;margin:14px 0 9px;}
+  .pip-desc{font-family:var(--fb);font-size:14px;line-height:1.7;color:#a9b8cf;}
+  .pip .sf-points{margin-top:16px;gap:12px 18px;max-width:none;}
+  .pip .sf-points b{font-size:13px;}
+  .pip .sf-points span{font-size:12.5px;}
+
+  @media(max-width:760px){
+    .mp-legend{top:84px;bottom:auto;left:18px;right:18px;}
+    .mp-cta{top:106px;bottom:auto;left:18px;right:18px;text-align:left;font-size:12px;}
+    /* map becomes a contained plan view; chips below carry the titles */
+    .mp-stage{inset:auto 0 auto 0;top:168px;height:auto;aspect-ratio:1000/560;}
+    .mpa b{display:none;}
+    .mpa-hint{display:none;}
+    .mp-chips{display:flex;flex-wrap:wrap;gap:8px;position:absolute;left:16px;right:16px;
+      top:calc(168px + 56vw + 18px);z-index:1;}
+    .mp-chips button{font-family:var(--fb);font-weight:600;font-size:12px;color:#dfeaf8;background:rgba(6,12,20,.78);
+      border:1px solid var(--line-bright);border-radius:2px;padding:9px 12px;cursor:pointer;}
+    .mp-chips button i{font-family:var(--fm);font-style:normal;font-size:10px;color:var(--cyan);margin-right:6px;}
+    .pip{top:auto;bottom:12px;left:12px;right:12px;width:auto;transform:translateY(18px);
+      max-height:70vh;overflow-y:auto;}
+    .pip.left{left:12px;right:12px;}
+    .pip.on{transform:translateY(0);}
+    .pip-title{font-size:20px;}
+  }
+
+  @media(max-width:760px){
+    /* center the whole image+text stack in the readable middle band */
+    .sceneframe{flex-direction:column !important;width:calc(100% - 36px);
+      left:18px !important;right:18px !important;gap:16px;
+      top:0 !important;bottom:0 !important;height:100vh;
+      justify-content:center !important;align-items:stretch !important;
+      padding-bottom:0 !important;text-align:left !important;}
+    .sceneframe.pos-right{text-align:left;}
+    .sf-card{flex:none;width:100%;}
+    .sf-imgwrap{aspect-ratio:16/9;}
+    .sf-info{width:100%;}
+    .sf-idx{margin-bottom:10px;}
+    .sf-rule{margin:12px 0;}
+    .pos-right .sf-rule,.pos-right .sf-desc{margin-left:0;}
+    .pos-right .sf-tags{justify-content:flex-start;}
+    .sf-title{font-size:clamp(26px,7vw,38px);}
+    .sf-desc{font-size:13.5px;line-height:1.65;max-width:none;}
+    .sf-tags{margin-top:16px;}
+    .sf-points{grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:14px;max-width:none;}
+    .sf-points b{font-size:11px;margin-bottom:3px;}
+    .sf-points span{font-size:10.5px;line-height:1.5;}
+    .pos-right .sf-points{margin-left:0;}
+    .sg-grid{grid-template-columns:1fr;gap:10px;width:calc(100% - 4px);}
+    .sg-card{padding:10px;gap:12px;}
+    .sg-imgwrap{flex-basis:34%;}
+    .sg-imgwrap img{min-height:84px;}
+    .sg-title{font-size:15px;margin-bottom:4px;}
+    .sg-desc{font-size:10.5px;line-height:1.5;}
+    .sg-tags{padding-top:7px;}
+    .sg-eyebrow{margin-bottom:18px;}
+    .st-h{font-size:28px;line-height:1.2;}
+    .ti-h{font-size:clamp(26px,7.5vw,42px);}
+    .ti-lede{font-size:13.5px;line-height:1.65;}
+    .ti-stage{min-height:170px;}
+  }
+
+  /* ============================================================
+     POST-CINEMATIC — normal-flow content sections
+     (products / contact / footer). Sit above the fixed 3D scene
+     on their own opaque background; scroll normally.
+     ============================================================ */
+  #site{position:relative;z-index:15;}
+  /* seam: let the tunnel end bleed into the content start */
+
+  .sec{position:relative;background:#05080f;padding:clamp(64px,10vh,150px) 0;}
+  /* faint measurement grid echoing the HUD, masked so it fades at edges */
+  .sec::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:clamp(46px,5vw,72px) clamp(46px,5vw,72px);
+    -webkit-mask-image:radial-gradient(120% 90% at 50% 30%,#000 40%,transparent 85%);
+    mask-image:radial-gradient(120% 90% at 50% 30%,#000 40%,transparent 85%);}
+  .sec-inner{position:relative;z-index:1;width:min(1180px,90vw);margin:0 auto;}
+
+  /* shared section header */
+  .eyebrow2{font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.24em;color:#3fe0c4;
+    display:inline-flex;align-items:center;gap:12px;margin-bottom:22px;}
+  .eyebrow2 .num{font-family:var(--fm);color:var(--faint);letter-spacing:.05em;}
+  .sec-title{font-family:var(--fd);font-weight:900;font-size:clamp(32px,5vw,68px);line-height:1.06;
+    letter-spacing:-.02em;color:#f3f8ff;}
+  .sec-title .accent{color:var(--cyan);text-shadow:0 0 40px rgba(55,224,242,.32);}
+  .sec-lede{font-family:var(--fb);font-weight:400;font-size:clamp(15px,1.2vw,17px);line-height:1.75;
+    color:#aab9d0;max-width:52ch;margin-top:26px;}
+
+  /* reveal-on-scroll (subtle, purposeful) */
+  [data-reveal]{opacity:0;transform:translateY(26px);
+    transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1);}
+  [data-reveal].in{opacity:1;transform:none;}
+  @media(prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none;}}
+
+  /* ===== products ===== */
+  .sec-products .sec-head{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+    gap:clamp(24px,4vw,64px);align-items:end;margin-bottom:clamp(46px,6vh,80px);}
+  .sec-products .sec-lede{margin-top:0;align-self:end;}
+  .prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,1.6vw,24px);}
+  .prod{position:relative;border:1px solid var(--line-bright);border-radius:3px;
+    background:linear-gradient(180deg,rgba(12,20,34,.55),rgba(6,10,18,.4));
+    padding:clamp(22px,2vw,30px) clamp(20px,1.8vw,28px);
+    display:flex;flex-direction:column;overflow:hidden;transition:border-color .4s,transform .4s;}
+  .prod:hover{border-color:rgba(55,224,242,.4);transform:translateY(-4px);}
+  .prod-corner{position:absolute;width:13px;height:13px;border:1.5px solid var(--cyan);opacity:.75;}
+  .prod-corner.tl{top:10px;left:10px;border-right:0;border-bottom:0;}
+  .prod-corner.br{bottom:10px;right:10px;border-left:0;border-top:0;}
+  .prod-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px;}
+  .prod-idx{font-family:var(--fm);font-size:12px;color:var(--cyan);letter-spacing:.06em;}
+  .prod-form{font-family:var(--fb);font-weight:600;font-size:11.5px;letter-spacing:.06em;color:var(--dim);text-align:right;}
+  .prod-name{font-family:var(--fd);font-weight:900;font-size:clamp(44px,4.4vw,64px);line-height:1;
+    letter-spacing:-.02em;color:#f3f8ff;margin:2px 0 12px;}
+  .prod-role{font-family:var(--fb);font-size:13px;line-height:1.6;color:#93a4bd;min-height:2.5em;margin-bottom:20px;}
+  .prod-rule{height:1px;background:var(--line-bright);margin-bottom:18px;}
+  .spec{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;}
+  .spec>div{display:flex;flex-direction:column;gap:5px;}
+  .spec dt{font-family:var(--fb);font-size:11px;letter-spacing:.04em;color:var(--faint);}
+  .spec dd{font-family:var(--fm);font-size:20px;font-weight:500;color:#eaf3ff;line-height:1;letter-spacing:.01em;}
+  .spec dd i{font-family:var(--fm);font-size:11.5px;font-style:normal;color:var(--dim);margin-left:2px;letter-spacing:.02em;}
+  .spec dd.t{font-family:var(--fb);font-size:15px;font-weight:600;}
+  .prod-foot{margin-top:auto;padding-top:20px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .prod-foot span{font-family:var(--fb);font-size:11px;letter-spacing:.04em;color:var(--faint);}
+  .prod-foot b{font-family:var(--fm);font-weight:500;font-size:13px;color:#bcd0e6;letter-spacing:.02em;text-align:right;}
+  .prod-foot b.t{font-family:var(--fb);}
+
+  /* ===== garage: robot + payload configurator (王者/暖暖-style fitting room) =====
+     A self-contained PAGE like the field map: on desktop it pins (sticky inside
+     the tall #garageWrap runner) and cross-fades in whole — it does not flow up
+     from below. Header is a stacked block: eyebrow / title / hint. */
+  @media(min-width:901px){
+    #garageWrap{height:460vh;}   /* runner: entrance ~54vh · part-4 hold · AI part-5 hold */
+    .sec-garage{position:sticky;top:0;height:100vh;box-sizing:border-box;overflow:hidden;
+      display:flex;flex-direction:column;justify-content:center;
+      padding:calc(92px + 1vh) 0 2.5vh;will-change:opacity,transform;}  /* clears the fixed logo */
+  }
+  .sec-garage .g-head{margin-bottom:clamp(14px,2.6vh,30px);}
+  .sec-garage .eyebrow2{margin-bottom:8px;}   /* tight eyebrow->title rhythm */
+  .g-title{font-family:var(--fd);font-weight:900;font-size:clamp(26px,2.6vw,38px);line-height:1.1;
+    letter-spacing:-.015em;color:#f3f8ff;margin:0 0 8px;}
+  .g-title .accent{color:var(--cyan);text-shadow:0 0 34px rgba(55,224,242,.3);}
+  .g-hint{font-family:var(--fb);font-size:12.5px;color:var(--dim);letter-spacing:.03em;}
+  .g-rig{display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr) minmax(210px,240px);
+    grid-template-areas:"spec stage mods" "spec dock mods";grid-template-rows:1fr auto;
+    gap:clamp(16px,2vw,28px);align-items:start;position:relative;}
+  /* left: live spec card */
+  .g-spec{grid-area:spec;position:relative;border:1px solid var(--line-bright);border-radius:3px;
+    background:linear-gradient(180deg,rgba(12,20,34,.55),rgba(6,10,18,.4));
+    padding:clamp(20px,1.8vw,26px);align-self:stretch;display:flex;flex-direction:column;
+    transition:opacity .22s,transform .22s;}
+  .g-spec.swap{opacity:0;transform:translateY(8px);}
+  /* balanced type: name stepped DOWN, detail copy stepped UP */
+  .gs-kind{font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.14em;color:var(--cyan);}
+  .gs-name{font-family:var(--fd);font-weight:900;font-size:clamp(24px,2.1vw,32px);line-height:1.1;color:#f3f8ff;margin:10px 0 3px;letter-spacing:-.01em;}
+  .gs-form{font-family:var(--fb);font-weight:600;font-size:13px;color:var(--dim);letter-spacing:.06em;}
+  .gs-role{font-family:var(--fb);font-size:13.5px;line-height:1.68;color:#93a4bd;margin:12px 0 16px;}
+  .gs-rule{height:1px;background:var(--line-bright);margin-bottom:16px;}
+  .g-spec .spec{gap:12px 16px;}
+  .g-spec .spec dt{font-size:12.5px;}
+  .g-spec .spec dd{font-size:19px;}
+  .gs-lines{list-style:none;display:flex;flex-direction:column;gap:11px;}
+  .gs-lines li{font-family:var(--fb);font-size:13.5px;line-height:1.6;color:#aebbd2;padding-left:15px;position:relative;}
+  .gs-lines li::before{content:"";position:absolute;left:0;top:.55em;width:5px;height:5px;border:1px solid var(--cyan);transform:rotate(45deg);}
+  .gs-foot{margin-top:auto;padding-top:14px;display:flex;justify-content:space-between;gap:10px;
+    font-family:var(--fb);font-size:12px;color:var(--faint);}
+  .gs-foot b{font-family:var(--fm);font-weight:500;font-size:13px;color:#bcd0e6;text-align:right;}
+  /* center: stage */
+  .g-stage{grid-area:stage;position:relative;min-height:clamp(300px,40vh,440px);display:flex;
+    align-items:center;justify-content:center;}
+  .g-platform{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:min(520px,86%);height:auto;opacity:.9;pointer-events:none;}
+  .g-dogwrap{position:relative;transition:transform .55s cubic-bezier(.16,1,.3,1),opacity .45s;z-index:1;}
+  .g-dogwrap.back{transform:translateX(-16%) scale(.74);opacity:.32;}
+  .g-plate{position:relative;width:min(400px,58vw);aspect-ratio:4/3;border:1px solid var(--line-bright);
+    border-radius:3px;overflow:hidden;background:#0a0f18;
+    box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 0 0 1px rgba(55,224,242,.07);}
+  .g-plate img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .25s,transform .3s;}
+  .g-plate img.swap{opacity:0;transform:scale(.97);}
+  .g-shadow{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);width:76%;height:44px;
+    background:radial-gradient(50% 50% at 50% 50%,rgba(55,224,242,.22),transparent 70%);filter:blur(6px);pointer-events:none;}
+  #gLink{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:2;}
+  .g-modcard{position:absolute;right:4%;top:50%;transform:translateY(-50%) scale(.96);z-index:3;
+    width:min(300px,44%);border:1px solid var(--line-bright);border-radius:3px;background:rgba(8,13,22,.92);
+    padding:12px;opacity:0;pointer-events:none;clip-path:inset(0 0 100% 0);
+    transition:opacity .3s ease .06s,transform .45s cubic-bezier(.16,1,.3,1) .06s,clip-path .4s cubic-bezier(.16,1,.3,1) .06s;}
+  .g-modcard.on{opacity:1;transform:translateY(-50%) scale(1);clip-path:inset(0 0 0 0);}
+  .g-modcard .imgbox{aspect-ratio:4/3;border:1px solid rgba(55,224,242,.16);border-radius:2px;overflow:hidden;background:#0d1420;display:flex;align-items:center;justify-content:center;}
+  .g-modcard .imgbox img{width:100%;height:100%;object-fit:cover;display:block;}
+  .g-modcard .imgbox svg{width:78%;height:auto;}
+  .g-modcard b{display:block;font-family:var(--fb);font-weight:600;font-size:14.5px;color:#dfeaf8;margin-top:10px;letter-spacing:.04em;}
+  .g-modcard b i{font-family:var(--fm);font-style:normal;font-size:12px;color:var(--cyan);margin-right:8px;}
+  /* tabs + panels */
+  .g-tab{display:flex;align-items:center;gap:10px;width:100%;justify-content:center;
+    background:rgba(6,12,20,.7);border:1px solid var(--line-bright);border-radius:2px;cursor:pointer;
+    font-family:var(--fb);font-weight:600;font-size:13.5px;letter-spacing:.06em;color:#dfeaf8;
+    padding:12px 16px;transition:border-color .25s,color .25s,box-shadow .25s;}
+  .g-tab i{font-family:var(--fm);font-style:normal;font-size:11px;color:var(--cyan);}
+  .g-tab::after{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:rotate(45deg) translateY(-1px);transition:transform .3s;opacity:.7;}
+  .g-tab.on{border-color:rgba(55,224,242,.65);color:#fff;box-shadow:0 0 0 1px rgba(55,224,242,.25),0 8px 30px rgba(55,224,242,.12);}
+  .g-tab.on::after{transform:rotate(225deg);}
+  .g-panel{overflow:hidden;max-height:0;opacity:0;transition:max-height .5s cubic-bezier(.16,1,.3,1),opacity .35s;}
+  .g-panel.open{opacity:1;}
+  /* right: modules */
+  .g-mods-col{grid-area:mods;align-self:stretch;display:flex;flex-direction:column;}
+  /* all 8 modules visible at once — compact rows, NO inner scroll */
+  .g-modpanel.open{max-height:480px;}
+  .g-modlist{margin-top:10px;display:flex;flex-direction:column;gap:7px;}
+  .g-mod{display:flex;align-items:center;gap:10px;text-align:left;background:rgba(6,12,20,.6);
+    border:1px solid var(--line);border-radius:2px;cursor:pointer;padding:6px 9px;
+    font-family:var(--fb);font-weight:500;font-size:13px;color:#c6d4e6;transition:border-color .2s,color .2s,background .2s;}
+  .g-mod:hover{border-color:rgba(55,224,242,.4);color:#fff;}
+  .g-mod.sel{border-color:rgba(55,224,242,.7);color:#fff;background:rgba(10,22,32,.85);}
+  .g-mod .th{flex:none;width:46px;height:34px;border:1px solid rgba(55,224,242,.18);border-radius:2px;overflow:hidden;background:#0d1420;display:flex;align-items:center;justify-content:center;}
+  .g-mod .th img{width:100%;height:100%;object-fit:cover;display:block;}
+  .g-mod .th svg{width:70%;height:auto;}
+  .g-mod i{font-family:var(--fm);font-style:normal;font-size:10px;color:var(--cyan);margin-right:2px;}
+  /* bottom: dog dock */
+  .g-dock{grid-area:dock;justify-self:center;width:min(460px,100%);margin-top:6px;}
+  .g-dogpanel.open{max-height:170px;}
+  .g-carousel{position:relative;height:136px;margin-top:10px;}
+  .g-dogitem{position:absolute;left:50%;top:6px;width:112px;cursor:pointer;background:none;border:0;padding:0;
+    transform:translateX(-50%);transition:transform .5s cubic-bezier(.16,1,.3,1),opacity .4s;font-family:var(--fb);}
+  .g-dogitem .dth{display:block;width:112px;height:78px;border:1px solid var(--line);border-radius:2px;overflow:hidden;background:#0a0f18;transition:border-color .25s,box-shadow .25s;}
+  .g-dogitem .dth img{width:100%;height:100%;object-fit:cover;display:block;}
+  .g-dogitem b{display:block;margin-top:7px;font-weight:600;font-size:13.5px;color:#c6d4e6;text-align:center;letter-spacing:.04em;}
+  .g-dogitem em{display:block;font-style:normal;font-size:11px;color:var(--faint);text-align:center;margin-top:2px;}
+  .g-dogitem.sel .dth{border-color:rgba(55,224,242,.75);box-shadow:0 0 0 1px rgba(55,224,242,.3),0 10px 34px rgba(55,224,242,.16);}
+  .g-dogitem.sel b{color:#fff;}
+  /* ============ part 5 (AI inspections) — lives on the SAME pinned page ============
+     Scrolling on: part-4 furniture exits, the dog stays, four capability groups
+     orbit it like satellites; picking one swings it to the front and pops an
+     iOS-long-press-style quick list; picking an item flanks the dog with cards. */
+  .sec-inner{position:relative;}
+  .g-head,.g-spec,.g-mods-col,.g-dock{transition:opacity .5s ease,transform .6s cubic-bezier(.16,1,.3,1);}
+  .sec-garage.ai :is(.g-head,.g-spec,.g-mods-col,.g-dock){opacity:0;pointer-events:none;}
+  .sec-garage.ai .g-head{transform:translateY(-14px);}
+  .sec-garage.ai .g-spec{transform:translateX(-26px);}
+  .sec-garage.ai .g-mods-col{transform:translateX(26px);}
+  .sec-garage.ai .g-dock{transform:translateY(22px);}
+  .ai-head{position:absolute;top:0;left:0;opacity:0;pointer-events:none;transform:translateY(14px);
+    transition:opacity .5s ease .15s,transform .6s cubic-bezier(.16,1,.3,1) .15s;}
+  .sec-garage.ai .ai-head{opacity:1;transform:none;}
+  /* orbiting capability groups */
+  .ai-orb{position:absolute;left:0;top:0;display:inline-flex;align-items:center;gap:10px;
+    background:rgba(6,12,20,.82);border:1px solid var(--line-bright);border-radius:2px;
+    padding:11px 17px;cursor:pointer;font-family:var(--fb);font-weight:600;font-size:14.5px;
+    letter-spacing:.05em;color:#dfeaf8;white-space:nowrap;
+    transition:border-color .25s,color .25s,box-shadow .25s,opacity .3s;will-change:transform;}
+  .ai-orb i{font-family:var(--fm);font-style:normal;font-size:12px;color:var(--cyan);}
+  .ai-orb::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 8px rgba(55,224,242,.9);flex:none;}
+  .ai-orb:hover{border-color:rgba(55,224,242,.5);color:#fff;}
+  .ai-orb.sel{border-color:rgba(55,224,242,.75);color:#fff;
+    box-shadow:0 0 0 1px rgba(55,224,242,.3),0 12px 40px rgba(55,224,242,.18);}
+  .ai-orb,.ai-menu,.ai-card{visibility:hidden;}
+  .sec-garage.ai :is(.ai-orb,.ai-menu,.ai-card){visibility:visible;}
+  /* iOS long-press quick list */
+  .ai-menu{position:absolute;z-index:6;width:280px;transform-origin:50% 100%;
+    background:rgba(9,14,23,.9);border:1px solid var(--line-bright);border-radius:3px;
+    backdrop-filter:blur(14px);box-shadow:0 24px 70px rgba(0,0,0,.6),0 0 0 1px rgba(55,224,242,.08);
+    opacity:0;pointer-events:none;transform:translate(-50%,8px) scale(.86);
+    transition:opacity .22s ease,transform .3s cubic-bezier(.2,1.1,.3,1);}
+  .ai-menu.on{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1);}
+  .ai-menu button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+    background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;
+    font-family:var(--fb);font-weight:500;font-size:14px;color:#cfdcec;padding:12px 16px;
+    transition:background .15s,color .15s;}
+  .ai-menu button:last-child{border-bottom:0;}
+  .ai-menu button:hover{background:rgba(55,224,242,.08);color:#fff;}
+  .ai-menu button.sel{color:var(--cyan);}
+  .ai-menu button i{font-family:var(--fm);font-style:normal;font-size:11px;color:var(--faint);}
+  .ai-menu button.sel i{color:var(--cyan);}
+  /* return-to-orbit control: visible whenever a group is parked at the front */
+  .ai-return{position:absolute;top:2px;right:2px;z-index:6;display:none;align-items:center;gap:8px;
+    background:rgba(6,12,20,.85);border:1px solid var(--line-bright);border-radius:2px;cursor:pointer;
+    font-family:var(--fb);font-weight:600;font-size:13px;letter-spacing:.05em;color:#dfeaf8;
+    padding:9px 14px;transition:border-color .25s,color .25s;visibility:hidden;}
+  .ai-return svg{width:15px;height:15px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;}
+  .ai-return:hover{border-color:rgba(55,224,242,.6);color:#fff;}
+  .sec-garage.ai.aipick .ai-return{display:inline-flex;visibility:visible;}
+  /* flanking detail cards — pinned to the RIG edges (full page width), in the
+     columns the part-4 furniture vacated */
+  .ai-card{position:absolute;top:calc(50% - 24px);z-index:5;width:min(390px,27vw);
+    background:rgba(7,11,19,.93);border:1px solid var(--line-bright);border-radius:3px;
+    padding:18px 20px;opacity:0;pointer-events:none;
+    transition:opacity .35s ease,transform .5s cubic-bezier(.16,1,.3,1);}
+  .ai-left{left:0;transform:translateY(-50%) translateX(-14px);}
+  .ai-right{right:0;transform:translateY(-50%) translateX(14px);}
+  .ai-card.on{opacity:1;pointer-events:auto;transform:translateY(-50%);}
+  .ai-x{position:absolute;top:10px;right:10px;}
+  .ai-cat{font-family:var(--fb);font-weight:600;font-size:12px;letter-spacing:.14em;color:var(--cyan);}
+  .ai-name{font-family:var(--fd);font-weight:900;font-size:24px;color:#f3f8ff;margin:9px 0 9px;line-height:1.2;}
+  .ai-desc{font-family:var(--fb);font-size:13.5px;line-height:1.7;color:#a9b8cf;}
+  .ai-dets{list-style:none;margin-top:13px;display:flex;flex-direction:column;gap:8px;}
+  .ai-dets li{font-family:var(--fb);font-size:13px;line-height:1.55;color:#8fa2bd;padding-left:15px;position:relative;}
+  .ai-dets li::before{content:"";position:absolute;left:0;top:.5em;width:5px;height:5px;border:1px solid var(--cyan);transform:rotate(45deg);}
+  .ai-imgbox{aspect-ratio:4/3;border:1px solid rgba(55,224,242,.16);border-radius:2px;overflow:hidden;background:#0d1420;position:relative;}
+  .ai-imgbox img{width:100%;height:100%;object-fit:cover;display:block;}
+  .ai-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px;}
+  .ai-chips b{font-family:var(--fb);font-weight:500;font-size:12px;letter-spacing:.03em;color:#bfeefc;
+    border:1px solid rgba(55,224,242,.28);padding:5px 11px;border-radius:2px;background:rgba(6,14,22,.5);}
+  .sec-garage.ai .g-dogwrap.aside{transform:scale(.84);opacity:.85;}
+  .ai-minihead{display:none;}
+
+  @media(max-width:900px){
+    .g-rig{grid-template-columns:1fr;grid-template-areas:"stage" "aright" "aleft" "dock" "mods" "spec";grid-template-rows:auto;}
+    .ai-left{grid-area:aleft;}
+    .ai-right{grid-area:aright;}
+    .g-stage{min-height:340px;}
+    .g-plate{width:min(340px,78vw);}
+    .g-dogwrap.back{transform:translateY(-6%) scale(.6);opacity:.28;}
+    .g-modcard{right:50%;transform:translate(50%,-50%) scale(.96);width:min(280px,74vw);top:52%;}
+    .g-modcard.on{transform:translate(50%,-50%) scale(1);}
+    .g-mods-col{align-self:auto;}
+    .g-modpanel.open{max-height:440px;}
+    .g-dock{width:100%;}
+    /* mobile: AI block is a normal stacked strip inside the stage (no orbit) */
+    .g-stage{flex-direction:column;gap:14px;}
+    .ai-head{display:none;}
+    .ai-minihead{display:flex;align-items:center;gap:10px;margin-top:10px;
+      font-family:var(--fb);font-weight:600;font-size:11px;letter-spacing:.22em;color:#3fe0c4;}
+    #aiOrbit{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+    .ai-orb{position:static;visibility:visible;transform:none !important;opacity:1 !important;}
+    .ai-menu{position:static;visibility:visible;width:100%;transform:none;display:none;}
+    .ai-menu.on{display:block;transform:none;}
+    .ai-card{position:static;visibility:visible;width:100%;transform:none;display:none;}
+    .ai-card.on{display:block;transform:none;}
+    .ai-return{position:static;align-self:center;margin-top:2px;}
+  }
+
+  /* ===== part 6: process + platform — Apple-keynote BENTO page =====
+     Same whole-page switch as the garage. Bento tiles use a bigger radius (a
+     deliberate, page-scoped departure) while keeping the graphite/cyan idiom. */
+  @media(min-width:901px){
+    #bentoWrap{height:260vh;}   /* two reveal phases: platform, then workflow */
+    .sec-bento{position:sticky;top:0;height:100vh;box-sizing:border-box;overflow:hidden;
+      display:flex;flex-direction:column;justify-content:center;
+      padding:calc(88px + 1vh) 0 3vh;will-change:opacity,transform;}
+    .sec-bento .sec-inner{display:flex;flex-direction:column;flex:1;min-height:0;width:min(1280px,94vw);}
+  }
+  .sec-bento .eyebrow2{margin-bottom:8px;}
+  .bento{flex:1;min-height:0;display:grid;gap:12px;margin-top:clamp(12px,2.2vh,24px);
+    grid-template-columns:repeat(6,1fr);
+    grid-template-rows:1fr 1fr auto minmax(150px,.8fr);
+    grid-template-areas:
+      "hero hero hero risk risk stat1"
+      "hero hero hero risk risk stat2"
+      "wf   wf   wf   wf   wf   wf"
+      "s1   s2   s3   s4   s5   loop";}
+  /* workflow divider: separates the platform mosaic from the process strip */
+  .bento-wf{grid-area:wf;display:flex;align-items:center;gap:14px;padding:2px 2px;}
+  .bento-wf i{font-family:var(--fb);font-style:normal;font-weight:600;font-size:11.5px;
+    letter-spacing:.22em;color:#3fe0c4;white-space:nowrap;}
+  .bento-wf::before{content:"";width:18px;height:1px;background:#3fe0c4;box-shadow:0 0 8px #3fe0c4;}
+  .bento-wf::after{content:"";flex:1;height:1px;background:var(--line);}
+  .bt{position:relative;border:1px solid var(--line-bright);border-radius:12px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(13,21,35,.72),rgba(7,11,19,.6));
+    padding:16px;display:flex;flex-direction:column;min-height:0;}
+  .bt-hero{grid-area:hero;}.bt-risk{grid-area:risk;}
+  .bt-stat1{grid-area:stat1;}.bt-stat2{grid-area:stat2;}
+  .bt-s1{grid-area:s1;}.bt-s2{grid-area:s2;}.bt-s3{grid-area:s3;}.bt-s4{grid-area:s4;}.bt-s5{grid-area:s5;}
+  .bt-loop{grid-area:loop;}
+  /* image tiles */
+  .bt-img{padding:0;}
+  .bt-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .bt-risk img{object-fit:contain;background:#0a0f18;}  /* show the FULL risk dashboard */
+  .bt-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(4,7,13,.55));}
+  .bt-risk::after{background:linear-gradient(180deg,transparent 72%,rgba(4,7,13,.4));}
+  .bt-img b{position:absolute;left:12px;bottom:12px;z-index:2;font-family:var(--fb);font-weight:600;
+    font-size:12.5px;letter-spacing:.04em;color:#eaf3ff;background:rgba(5,9,16,.72);
+    border:1px solid rgba(55,224,242,.28);border-radius:6px;padding:7px 11px;backdrop-filter:blur(6px);}
+  /* stat tiles */
+  .bt-stat i{font-family:var(--fm);font-style:normal;font-size:10px;letter-spacing:.18em;color:var(--faint);}
+  .bt-stat strong{font-family:var(--fm);font-weight:500;font-size:clamp(24px,2.4vw,36px);color:#eaf6ff;
+    letter-spacing:.01em;margin:8px 0 6px;line-height:1;}
+  .bt-stat strong em{font-style:normal;color:var(--cyan);}
+  .bt-stat p{font-family:var(--fb);font-size:11.5px;line-height:1.55;color:#8fa2bd;}
+  .bt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px;}
+  .bt-chips b{font-family:var(--fb);font-weight:500;font-size:10.5px;color:#bfeefc;
+    border:1px solid rgba(55,224,242,.28);border-radius:6px;padding:3px 9px;background:rgba(6,14,22,.5);}
+  /* step tiles — chained by flowing chevrons so the row reads as ONE process */
+  .bt-step{overflow:visible;}
+  .bt-step svg{width:24px;height:24px;stroke:var(--cyan);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
+    filter:drop-shadow(0 0 6px rgba(55,224,242,.35));}
+  .bt-step i{font-family:var(--fm);font-style:normal;font-size:11.5px;color:var(--cyan);margin-top:10px;}
+  .bt-step b{font-family:var(--fd);font-weight:700;font-size:16px;color:#eef5ff;margin:3px 0 6px;letter-spacing:.01em;}
+  .bt-step p{font-family:var(--fb);font-size:12px;line-height:1.55;color:#8698b3;}
+  .bt-step::after{content:"";position:absolute;right:-10.5px;top:50%;width:9px;height:9px;z-index:1;
+    border-top:1.5px solid rgba(55,224,242,.75);border-right:1.5px solid rgba(55,224,242,.75);
+    transform:translateY(-50%) rotate(45deg);filter:drop-shadow(0 0 5px rgba(55,224,242,.6));
+    animation:wfPulse 1.8s ease-in-out infinite;}
+  @keyframes wfPulse{0%,100%{opacity:.45;}50%{opacity:1;}}
+  .bt-step:nth-of-type(6)::after{animation-delay:.15s;}
+  .bt-step:nth-of-type(7)::after{animation-delay:.3s;}
+  .bt-step:nth-of-type(8)::after{animation-delay:.45s;}
+  .bt-step:nth-of-type(9)::after{animation-delay:.6s;}
+  /* loop tile */
+  .bt-loop svg{width:30px;height:30px;stroke:var(--cyan);fill:none;stroke-width:1.6;stroke-linecap:round;
+    animation:btSpin 12s linear infinite;filter:drop-shadow(0 0 6px rgba(55,224,242,.4));}
+  @keyframes btSpin{to{transform:rotate(360deg);}}
+  .bt-loop b{font-family:var(--fd);font-weight:700;font-size:15px;color:#eef5ff;margin:10px 0 6px;}
+  .bt-loop p{font-family:var(--fb);font-size:11px;line-height:1.55;color:#8698b3;}
+  /* keynote pop-in, TWO phases: platform mosaic first, workflow strip on the
+     next stretch of scroll (.shown -> .shown2) */
+  @media(min-width:901px){
+    .sec-bento :is(.bt,.bento-wf){opacity:0;transform:translateY(18px);
+      transition:opacity .5s ease,transform .6s cubic-bezier(.16,1,.3,1);}
+    .sec-bento .bt-step::after{opacity:0;transition:opacity .4s;animation:none;}
+    .sec-bento.shown :is(.bt-hero,.bt-risk,.bt-stat1,.bt-stat2){opacity:1;transform:none;}
+    .sec-bento.shown .bt-risk{transition-delay:.07s;}
+    .sec-bento.shown .bt-stat1{transition-delay:.14s;}
+    .sec-bento.shown .bt-stat2{transition-delay:.21s;}
+    .sec-bento.shown2 :is(.bento-wf,.bt-step,.bt-loop){opacity:1;transform:none;}
+    .sec-bento.shown2 .bt-s1{transition-delay:.08s;}
+    .sec-bento.shown2 .bt-s2{transition-delay:.16s;}
+    .sec-bento.shown2 .bt-s3{transition-delay:.24s;}
+    .sec-bento.shown2 .bt-s4{transition-delay:.32s;}
+    .sec-bento.shown2 .bt-s5{transition-delay:.4s;}
+    .sec-bento.shown2 .bt-loop{transition-delay:.48s;}
+    .sec-bento.shown2 .bt-step::after{animation:wfPulse 1.8s ease-in-out infinite;opacity:1;}
+  }
+  @media(max-width:900px){
+    .bento{grid-template-columns:1fr 1fr;grid-template-areas:none;grid-template-rows:none;gap:10px;}
+    .bento .bt,.bento .bento-wf{grid-area:auto;}
+    .bt-hero,.bt-risk,.bt-loop,.bt-stat2,.bento-wf{grid-column:span 2;}
+    .bt-img{aspect-ratio:16/9;}
+    .bt-step p{font-size:11px;}
+    .bt-step::after{display:none;}
+  }
+
+  .contact-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(28px,5vw,80px);align-items:start;}
+  /* left column: info rows + socials */
+  .clead-rows{margin-top:30px;display:flex;flex-direction:column;gap:20px;}
+  .clead-rows div{display:grid;grid-template-columns:64px 1fr;gap:16px;align-items:baseline;}
+  .clead-rows dt{font-family:var(--fb);font-weight:700;font-size:14.5px;color:#eaf2ff;}
+  .clead-rows dd{font-family:var(--fb);font-size:14.5px;line-height:1.75;color:#aab9d0;}
+  .clead-rows dd a{color:var(--cyan);text-decoration:none;}
+  .clead-rows dd a:hover{text-decoration:underline;}
+  .socials{display:flex;gap:12px;margin-top:32px;}
+  .soc{display:flex;align-items:center;justify-content:center;width:58px;height:44px;
+    border:1px solid var(--line-bright);border-radius:3px;background:rgba(9,15,26,.55);
+    color:#7fe6dc;transition:border-color .25s,color .25s,transform .25s;}
+  .soc svg{width:20px;height:20px;}
+  .soc:hover{border-color:rgba(55,224,242,.55);color:#fff;transform:translateY(-2px);}
+  .soc-red{font-family:var(--fb);font-weight:800;font-size:11px;letter-spacing:.04em;
+    color:#fff;background:#ff2442;border-color:#ff2442;text-decoration:none;border-radius:3px;}
+  .soc-red:hover{color:#fff;border-color:#ff5c73;}
+  /* right column: lead form (live formsubmit backend, same as the original site) */
+  .lead-form{position:relative;border:1px solid var(--line-bright);border-radius:3px;
+    background:rgba(9,15,26,.5);padding:clamp(20px,2vw,30px);}
+  .lf-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+  .lead-form label{display:flex;flex-direction:column;gap:8px;
+    font-family:var(--fb);font-weight:600;font-size:13.5px;color:#dfeaf8;letter-spacing:.02em;}
+  .lead-form input,.lead-form select,.lead-form textarea{
+    width:100%;background:#0a1220;border:1px solid var(--line-bright);border-radius:2px;
+    color:var(--ink);font-family:var(--fb);font-size:14px;padding:12px 13px;outline:none;
+    transition:border-color .25s,box-shadow .25s;}
+  .lead-form ::placeholder{color:#5d7290;}
+  .lead-form select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#7e90ab 50%),linear-gradient(135deg,#7e90ab 50%,transparent 50%);
+    background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;}
+  .lead-form input:focus,.lead-form select:focus,.lead-form textarea:focus{
+    border-color:rgba(55,224,242,.6);box-shadow:0 0 0 1px rgba(55,224,242,.25);}
+  .lead-form textarea{resize:vertical;min-height:110px;line-height:1.6;}
+  .lf-full{margin-bottom:16px;}
+  .lf-submit{width:100%;justify-content:center;margin-top:2px;border:0;cursor:pointer;}
+  @media(max-width:900px){
+    .lf-row{grid-template-columns:1fr;}
+  }
+  .cta-big{display:inline-flex;align-items:center;gap:14px;margin-top:38px;
+    font-family:var(--fb);font-weight:600;font-size:15px;letter-spacing:.02em;color:#05080f;
+    background:var(--cyan);padding:15px 30px;border-radius:999px;text-decoration:none;
+    box-shadow:0 0 0 1px rgba(55,224,242,.4),0 14px 40px rgba(55,224,242,.22);transition:.25s;}
+  .cta-big span{transition:transform .25s;}
+  .cta-big:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(55,224,242,.6),0 18px 50px rgba(55,224,242,.34);}
+  .cta-big:hover span{transform:translateX(5px);}
+  .contact-info{border:1px solid var(--line-bright);border-radius:3px;background:rgba(9,15,26,.45);
+    padding:clamp(8px,1vw,14px) clamp(20px,2vw,30px);position:relative;}
+  .cinfo-row{display:flex;justify-content:space-between;align-items:baseline;gap:18px;
+    padding:18px 0;border-bottom:1px solid var(--line);}
+  .cinfo-row:last-child{border-bottom:0;}
+  .cinfo-row dt{font-family:var(--fb);font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;flex:none;padding-top:3px;}
+  .cinfo-row dd{font-family:var(--fm);font-size:15px;color:#eaf3ff;text-align:right;line-height:1.5;letter-spacing:.01em;word-break:break-word;}
+  .cinfo-row dd a{color:inherit;text-decoration:none;transition:color .2s;}
+  .cinfo-row dd a:hover{color:var(--cyan);}
+  .cinfo-row dd.t{font-family:var(--fb);font-size:13.5px;color:#bcd0e6;}
+  .cinfo-row dd small{display:block;font-family:var(--fb);font-size:11px;color:var(--faint);margin-top:3px;letter-spacing:.02em;}
+
+  /* ===== footer ===== */
+  .sitefoot{position:relative;z-index:15;background:#04060c;border-top:1px solid var(--line);
+    padding:44px 0;}
+  .foot-inner{width:min(1180px,90vw);margin:0 auto;display:flex;justify-content:space-between;
+    align-items:center;gap:24px;flex-wrap:wrap;}
+  .foot-brand{display:flex;align-items:center;gap:16px;}
+  .foot-brand img{width:120px;display:block;opacity:.9;}
+  .foot-brand span{font-family:var(--fb);font-size:12px;color:var(--dim);letter-spacing:.04em;}
+  .foot-meta{font-family:var(--fm);font-size:11.5px;color:var(--faint);letter-spacing:.05em;text-align:right;}
+  .foot-meta b{font-weight:500;color:var(--dim);}
+
+  @media(max-width:900px){
+    .sec-products .sec-head{grid-template-columns:1fr;gap:20px;}
+    .prod-grid{grid-template-columns:1fr;gap:14px;}
+    .prod-role{min-height:0;}
+    .contact-grid{grid-template-columns:1fr;gap:28px;}
+  }
+  @media(max-width:760px){
+    .sec{padding:56px 0;}
+    .sec-title{font-size:clamp(28px,8vw,40px);}
+    .prod-name{font-size:52px;}
+    .spec dd{font-size:19px;}
+    .cta-big{width:100%;justify-content:center;}
+    .foot-inner{flex-direction:column;align-items:flex-start;}
+    .foot-meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<img id="dog" src="assets/robot.png" alt="Da Vinci 巡检机器狗">
+<div id="scrim"></div>
+<!-- precision-instrument HUD overlay: hairline grid, frame ticks -->
+<div id="hud">
+  <div class="hud-grid"></div>
+  <div class="hud-frame">
+    <span class="tick tl"></span><span class="tick tr"></span><span class="tick bl"></span><span class="tick br"></span>
+  </div>
+</div>
+<div id="grain"></div>
+
+<header>
+  <img id="logo" src="assets/logo.png" alt="Da Vinci Robotics">
+  <nav>
+    <a data-nav="map" data-en="Scenarios">场景</a>
+    <a data-nav="garage" href="#products" data-en="Robots">机器人</a>
+    <a data-nav="ai" data-en="AI Inspections">AI 巡检</a>
+    <a data-nav="bento" href="#platform" data-en="Platform">流程与平台</a>
+  </nav>
+  <button class="lang" id="langBtn" type="button">EN</button>
+  <a class="cta" href="#contact" data-en="Book a Demo">预约演示</a>
+</header>
+
+<!-- copy phase 1: hero — asymmetric editorial grid -->
+<div class="copy hero1" id="c1">
+  <div class="hero-grid">
+    <div class="eyebrow green" id="hEyebrow"><span class="eb-tick"></span><span data-en="Intelligent Inspection Robot Solutions">智能巡检机器人解决方案</span></div>
+    <h1 class="htitle">
+      <span class="t-lead" data-en="Autonomous Inspection">自主巡检</span>
+      <span class="t-trail" data-en="Experts">专家</span>
+    </h1>
+    <p class="lede" id="hLede" data-en-html="Robots, payload modules, AI inspection and an inspection platform<br>for maintenance, security and safety patrol.">面向运维、安防与安全巡检的机器人、<br>上装模块、AI 巡检与巡检平台。</p>
+
+    <!-- single rotating capability frame: 01→04 auto + swipe + dots -->
+    <div class="cardwrap" id="cardwrap">
+      <div class="card-rail" id="cardRail">
+        <span class="card-idx"><b id="cardN">01</b><i>/ 04</i></span>
+        <div class="card-body">
+          <div class="card-title" id="cardT">路线规划</div>
+          <div class="card-sub" id="cardS">点位 · 排班 · 上装规则</div>
+        </div>
+      </div>
+      <div class="card-dots" id="cardDots"></div>
+    </div>
+  </div>
+</div>
+
+<div class="hint" id="hint"><span class="ht" data-en="Scroll Down">向下滚动</span><span class="drop"></span></div>
+
+<!-- ===== tunnel-entry intro (appears as the dog is drawn in, before scenes) ===== -->
+<div class="tunnelintro" id="tunIntro">
+  <div class="ti-eyebrow"><span class="eb-tick"></span><span data-en="Highlights">产品特色</span></div>
+  <div class="ti-stage" id="tiStage">
+
+    <!-- BEAT 1 · 人机协动 : human's fixed route handed to the robot -->
+    <div class="ti-beat" data-i="0">
+      <div class="ti-diagram" aria-hidden="true">
+        <svg viewBox="0 0 320 120" class="dg dg-handoff" preserveAspectRatio="xMidYMid meet">
+          <!-- patrol route (dashed path with waypoints) -->
+          <path class="dg-route" d="M24 92 H120 M160 92 H296"/>
+          <path class="dg-route dg-route-curve" d="M120 92 q20 0 20 -20 q0 -20 20 -20"/>
+          <g class="dg-nodes">
+            <circle class="dg-node" cx="24" cy="92" r="4"/>
+            <circle class="dg-node" cx="120" cy="92" r="4"/>
+            <circle class="dg-node" cx="160" cy="52" r="4"/>
+            <circle class="dg-node" cx="228" cy="52" r="4"/>
+            <circle class="dg-node" cx="296" cy="52" r="4"/>
+          </g>
+          <!-- human (fades out) -->
+          <g class="dg-human">
+            <circle cx="24" cy="70" r="7"/>
+            <path d="M24 77 V96 M24 84 H16 M24 84 H32 M24 96 L18 108 M24 96 L30 108"/>
+          </g>
+          <!-- robot dog (travels the route) -->
+          <g class="dg-robot">
+            <rect x="-13" y="-9" width="26" height="13" rx="2"/>
+            <path d="M-9 4 V12 M-3 4 V12 M3 4 V12 M9 4 V12"/>
+            <path d="M13 -6 l7 -5"/>
+            <circle cx="21" cy="-12" r="2.5" class="dg-robot-head"/>
+          </g>
+        </svg>
+      </div>
+      <h2 class="ti-h" data-split><span data-en="Manual Rounds">人机</span><span class="ti-accent" data-en="→ Robot Routes">协动</span></h2>
+      <p class="ti-lede" data-en-html="Shift repetitive fixed-route checks to scheduled robot patrols,<br>while staff focus on review and response.">把重复的固定路线交给机器人按班次巡检,<br>人专注于复核与处置。</p>
+    </div>
+
+    <!-- BEAT 2 · 全地形自主运动 : terrain profile with obstacles + stairs -->
+    <div class="ti-beat" data-i="1">
+      <div class="ti-diagram" aria-hidden="true">
+        <svg viewBox="0 0 320 120" class="dg dg-terrain" preserveAspectRatio="xMidYMid meet">
+          <!-- ground reference line -->
+          <path class="dg-ground" d="M12 100 H308"/>
+          <!-- terrain profile: flat → gravel bumps → stairs -->
+          <path class="dg-profile" d="M12 92 H70
+            q6 0 9 -5 q4 -7 9 0 q4 7 9 0 q4 -7 9 0 q4 7 9 0 q3 5 9 5 H150
+            L150 76 H176 L176 60 H202 L202 44 H232"/>
+          <!-- robot traversing -->
+          <g class="dg-robot dg-robot-terrain">
+            <rect x="-12" y="-9" width="24" height="12" rx="2"/>
+            <path d="M-8 3 V11 M-2 3 V11 M4 3 V11 M9 3 V11"/>
+            <path d="M12 -6 l6 -4"/>
+            <circle cx="19" cy="-11" r="2.4" class="dg-robot-head"/>
+          </g>
+          <!-- terrain labels -->
+          <g class="dg-terrain-lbls">
+            <text x="40" y="114" data-en="Flat">平地</text>
+            <text x="108" y="114" data-en="Gravel">碎石</text>
+            <text x="196" y="30" data-en="Stairs">楼梯</text>
+          </g>
+        </svg>
+      </div>
+      <h2 class="ti-h" data-split><span data-en="Autonomous Navigation">全地形</span><span class="ti-accent" data-en="&amp; All-Terrain Patrol">自主运动</span></h2>
+      <p class="ti-lede" data-en-html="Route coverage, completion records, visual evidence, alerts and monthly reports stay traceable across grass, gravel and uneven roads;<br>the quadruped handles stairs and thresholds where wheeled robots are limited.">自主导航,路线覆盖、完成记录、视频证据、告警与月度报告在草地、碎石与不平路面上均可追溯;<br>四足平台可应对楼梯与门槛通行,适应轮式机器人受限的场景。</p>
+      <div class="ti-tags">
+        <b data-en="Slope ≤ ±45°">斜坡 ≤ ±45°</b><b data-en="Obstacle ≤ 25cm">越障 ≤ 25cm</b><b data-en="IP66 Protection">防护 IP66</b><b data-en="Stairs · Thresholds">楼梯 · 门槛</b>
+      </div>
+    </div>
+
+    <!-- BEAT 3 · 强 AI 巡检能力 : multi-sensor scan locking detections -->
+    <div class="ti-beat" data-i="2">
+      <div class="ti-diagram" aria-hidden="true">
+        <svg viewBox="0 0 320 120" class="dg dg-scan" preserveAspectRatio="xMidYMid meet">
+          <!-- robot emitter at left -->
+          <g class="dg-robot dg-robot-scan">
+            <rect x="26" y="66" width="26" height="13" rx="2"/>
+            <path d="M30 79 V88 M36 79 V88 M42 79 V88 M48 79 V88"/>
+            <path d="M52 68 l7 -5"/>
+            <circle cx="60" cy="60" r="2.6" class="dg-robot-head"/>
+          </g>
+          <!-- scan cone -->
+          <path class="dg-cone" d="M60 60 L300 26 A244 244 0 0 1 300 96 Z"/>
+          <!-- concentric scan rings -->
+          <path class="dg-ring" d="M60 60 m-0 -34 a34 34 0 0 1 0 68" />
+          <path class="dg-ring dg-ring-2" d="M60 60 m-0 -58 a58 58 0 0 1 0 116" />
+          <!-- detection boxes (lock one by one) -->
+          <g class="dg-detect" data-d="0"><rect x="150" y="34" width="30" height="22" rx="1.5"/><path class="dg-tick" d="M157 45 l5 5 l9 -11"/><text x="165" y="30" data-en="Hot spot">热点</text></g>
+          <g class="dg-detect" data-d="1"><rect x="214" y="52" width="30" height="22" rx="1.5"/><path class="dg-tick" d="M221 63 l5 5 l9 -11"/><text x="229" y="48" data-en="Meter">仪表</text></g>
+          <g class="dg-detect" data-d="2"><rect x="188" y="80" width="30" height="22" rx="1.5"/><path class="dg-tick" d="M195 91 l5 5 l9 -11"/><text x="203" y="76" data-en="Fire">烟火</text></g>
+        </svg>
+      </div>
+      <h2 class="ti-h" data-split><span data-en="Strong">强</span><span class="ti-accent" data-en="AI Inspection Capability">AI 巡检能力</span></h2>
+      <p class="ti-lede" data-en-html="Thermal anomalies, meter OCR, smoke &amp; fire, intrusion alerts, PPE checks and gas monitoring,<br>with audit-ready inspection reports.">热异常、仪表读数、烟火识别、入侵告警、PPE 检查与气体监测,<br>生成可审计的巡检报告。</p>
+    </div>
+
+  </div>
+  <!-- breathing vanishing-point light at tunnel center -->
+  <div class="ti-corepoint" id="tiCore" aria-hidden="true"></div>
+</div>
+
+<!-- ===== multi-scene section overlays (pinned, scroll-driven) ===== -->
+<!-- big section title -->
+<div class="sectitle" id="secTitle">
+  <div class="st-eyebrow"><span class="eb-tick"></span><span data-en="SOLUTIONS / Scenarios">SOLUTIONS / 应用场景</span></div>
+  <h2 class="st-h"><span data-en="Solutions Across">面向多场景的</span><span class="st-accent" data-en="Inspection Scenarios">巡检解决方案</span></h2>
+</div>
+
+<!-- ============ interactive FIELD MAP: section-3 stage ============ -->
+<div class="fieldmap" id="fieldMap">
+  <div class="mp-stage" id="mpStage">
+    <svg id="mpSvg" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <!-- surveyor edge ticks -->
+      <g class="mp-tick-g">
+        <text class="mp-tick" x="196" y="18">200</text><text class="mp-tick" x="396" y="18">400</text>
+        <text class="mp-tick" x="596" y="18">600</text><text class="mp-tick" x="796" y="18">800</text>
+        <text class="mp-tick" x="14" y="204">200</text><text class="mp-tick" x="14" y="404">400</text>
+      </g>
+      <!-- topographic contour field (generated by JS at load) -->
+      <g class="mp-contour" id="mpContours"></g>
+      <!-- engineering-drawing layer: parcel boundary, station crosses, dims, spot levels -->
+      <g class="mp-eng">
+        <rect class="mp-bound" x="34" y="30" width="932" height="500" rx="4"/>
+        <path class="mp-cross" d="M500,54 v12 M494,60 h12 M160,294 v12 M154,300 h12 M840,294 v12 M834,300 h12 M500,502 v12 M494,508 h12"/>
+        <path class="mp-diml" d="M108,500 v10 M298,500 v10 M108,505 H298"/>
+        <path class="mp-arr" d="M108,505 l7,-3 v6 z M298,505 l-7,-3 v6 z"/>
+        <text class="mp-dim" x="203" y="498">190.0</text>
+        <text class="mp-dim" x="330" y="214">+12.50</text>
+        <text class="mp-dim" x="590" y="142">+18.20</text>
+        <text class="mp-dim" x="430" y="472">+9.80</text>
+      </g>
+      <!-- service roads -->
+      <g class="mp-road">
+        <path d="M40,322 C240,300 420,332 520,330 C680,328 780,300 956,282"/>
+        <path d="M322,58 C360,160 306,258 214,304"/>
+        <path d="M560,520 C610,472 636,446 652,436"/>
+      </g>
+      <!-- grain depot -->
+      <g class="mp-zone">
+        <rect x="120" y="86" width="150" height="64" rx="3"/>
+        <circle cx="140" cy="182" r="12"/><circle cx="172" cy="182" r="12"/>
+        <circle cx="204" cy="182" r="12"/><circle cx="236" cy="182" r="12"/>
+      </g>
+      <text class="mp-lbl" x="126" y="76" data-en="Grain Depot">粮库区</text>
+      <!-- parking structure -->
+      <g class="mp-zone">
+        <rect x="108" y="376" width="190" height="108" rx="6"/>
+        <path class="mp-stalls" d="M138,376 v108 M168,376 v108 M198,376 v108 M228,376 v108 M258,376 v108 M108,430 h190"/>
+      </g>
+      <text class="mp-lbl" x="112" y="366" data-en="Parking">停车区</text>
+      <!-- tailings pond + culvert -->
+      <g class="mp-zone">
+        <path class="mp-pond" d="M737,90 q30,-18 64,-8 q32,10 27,36 q-5,24 -36,28 q-36,5 -55,-13 q-17,-17 0,-43z"/>
+        <path class="mp-culvert" d="M698,152 L782,124"/>
+      </g>
+      <text class="mp-lbl" x="744" y="66" data-en="Tailings">尾矿库</text>
+      <!-- data-center halls -->
+      <g class="mp-zone">
+        <rect x="648" y="380" width="210" height="34" rx="2"/>
+        <rect x="648" y="428" width="210" height="34" rx="2"/>
+        <path class="mp-stalls" d="M690,380 v34 M732,380 v34 M774,380 v34 M816,380 v34 M690,428 v34 M732,428 v34 M774,428 v34 M816,428 v34"/>
+      </g>
+      <text class="mp-lbl" x="648" y="370" data-en="Data Center">数据中心</text>
+      <!-- hub structure (the "更多巡检场景" anchor sits here; its own label names it) -->
+      <g class="mp-zone"><path d="M497,272 l17,10 v20 l-17,10 -17,-10 v-20 z"/></g>
+      <!-- patrol route through all anchors + roaming robot dot -->
+      <path id="mpRouteP" class="mp-route" d="M190,140 C170,250 175,340 200,435 C300,478 430,390 497,318 C560,368 662,432 760,415 C838,398 822,232 790,120 C716,58 296,84 190,140 Z"/>
+      <circle class="mp-bot" r="3.4"><animateMotion dur="16s" repeatCount="indefinite" rotate="none"><mpath href="#mpRouteP"/></animateMotion></circle>
+      <!-- north arrow -->
+      <g class="mp-north"><path d="M958,30 l7,20 -7,-6 -7,6 z"/><text x="953" y="64">N</text></g>
+    </svg>
+    <!-- anchors are generated into the stage by JS -->
+  </div>
+
+  <div class="mp-legend">
+    <div class="mp-eyebrow"><span class="eb-tick"></span><span data-en="FIELD MAP · Site Plan">FIELD MAP · 巡检现场总图</span></div>
+  </div>
+  <div class="mp-cta" data-en="Click an anchor to explore each scenario's live inspection">点击地图,探索各场景的实景巡检方案</div>
+  <div class="mp-chips" id="mpChips"></div>
+  <div class="mp-scrim" id="mpScrim"></div>
+  <svg id="mlink" aria-hidden="true"></svg>
+
+  <!-- PiP: video + title + copy, linked out of the clicked anchor -->
+  <div class="pip" id="pip">
+    <span class="pip-cnr tl"></span><span class="pip-cnr br"></span>
+    <div class="pip-head"><span class="pip-idx" id="pipIdx">01 / 04</span><span class="pip-area" id="pipArea"></span>
+      <button class="pip-x" id="pipX" aria-label="关闭">×</button></div>
+    <div class="sf-imgwrap"><video class="sf-img" id="pipVid" muted loop playsinline preload="none"></video><img class="sf-img" id="pipImg" alt="" style="display:none"><span class="sf-scan"></span><span class="sf-cnr tl"></span><span class="sf-cnr br"></span></div>
+    <h3 class="pip-title" id="pipTitle"></h3>
+    <p class="pip-desc" id="pipDesc"></p>
+    <div class="sf-points" id="pipPoints"></div>
+  </div>
+
+<!-- "更多巡检场景" matrix (opened by its map anchor) -->
+<div class="solgrid" id="solGrid">
+  <div class="sg-eyebrow"><span class="eb-tick"></span><span data-en="SOLUTIONS · More Scenarios">SOLUTIONS · 更多巡检场景</span><button class="sg-x" id="sgX" aria-label="关闭">×</button></div>
+  <div class="sg-grid">
+    <div class="sg-card"><span class="sg-cnr tl"></span><span class="sg-cnr br"></span><span class="sg-idx">05</span>
+      <div class="sg-imgwrap"><img src="assets/park.jpg" alt=""></div>
+      <div class="sg-info"><div class="sg-title" data-en="Campus &amp; Secure Facilities">园区与安防</div>
+        <p class="sg-desc" data-en="Checkpoint patrol, restricted-area detection, night patrol, parking areas, abnormal stay alerts, and inspection record keeping.">点位巡逻、受控区检测、夜间巡逻、停车区管理、异常停留告警与巡检记录留存。</p>
+        <div class="sg-tags"><b data-en="Checkpoints">点位巡逻</b><b data-en="Parking">停车区</b><b data-en="Night">夜巡</b></div></div></div>
+    <div class="sg-card"><span class="sg-cnr tl"></span><span class="sg-cnr br"></span><span class="sg-idx">06</span>
+      <div class="sg-imgwrap"><img src="assets/semicon.jpg" alt=""></div>
+      <div class="sg-info"><div class="sg-title" data-en="Semiconductor">半导体</div>
+        <p class="sg-desc" data-en="Factory patrol, utility corridor checks, environmental inspection, and configurable safety or equipment monitoring.">厂区巡逻、公用动力管廊检查、环境巡检,以及可配置的安全与设备监测。</p>
+        <div class="sg-tags"><b data-en="Factory">厂区</b><b data-en="Utilities">动力管廊</b><b data-en="Environment">环境</b></div></div></div>
+    <div class="sg-card"><span class="sg-cnr tl"></span><span class="sg-cnr br"></span><span class="sg-idx">07</span>
+      <div class="sg-imgwrap"><img src="assets/power.jpg" alt=""></div>
+      <div class="sg-info"><div class="sg-title" data-en="Energy">能源</div>
+        <p class="sg-desc" data-en="Substations, tailings culvert inspection, hazardous areas, remote routes, equipment states, thermal anomalies, and safety events.">覆盖变电站与尾矿涵洞巡检,兼顾危险区域与偏远路线,跟踪设备状态、热异常与安全事件。</p>
+        <div class="sg-tags"><b data-en="Substation">变电站</b><b data-en="Tailings">尾矿</b><b data-en="Remote">偏远路线</b></div></div></div>
+    <div class="sg-card"><span class="sg-cnr tl"></span><span class="sg-cnr br"></span><span class="sg-idx">08</span>
+      <div class="sg-imgwrap"><img src="assets/factory.jpg" alt=""></div>
+      <div class="sg-info"><div class="sg-title" data-en="Factory &amp; Industrial Parks">工厂与产业园区</div>
+        <p class="sg-desc" data-en="Security patrol, fire passage checks, night patrol, environmental monitoring, vehicle management, and incident verification.">安防巡逻、消防通道检查、夜间巡逻、环境监测、车辆管理与事件核实。</p>
+        <div class="sg-tags"><b data-en="Security">安防</b><b data-en="Fire Access">消防通道</b><b data-en="Night">夜巡</b></div></div></div>
+  </div>
+</div>
+
+</div><!-- /fieldmap -->
+
+<div id="spacer"></div>
+
+<!-- ============ POST-CINEMATIC normal-flow content ============ -->
+<div id="site">
+
+  <!-- ===== garage: robot + payload configurator (fitting-room interaction).
+       Wrapped in a tall runner so the page PINS and cross-fades in whole,
+       like the field map — it does not flow up from below. ===== -->
+  <div id="garageWrap">
+  <section id="products" class="sec sec-garage">
+    <div class="sec-inner">
+      <div class="g-head">
+        <div class="eyebrow2"><span class="eb-tick"></span><span data-en="HARDWARE · Body &amp; Payloads">HARDWARE · 机体与上装</span></div>
+        <h2 class="g-title"><span data-en="Pick a robot, ">选一台机器狗，</span><span class="accent" data-en="fit the payloads">配一套上装</span></h2>
+        <p class="g-hint" data-en="3 robots × 8 payload modules · use the tabs below and to the right to build your setup">三款机体 × 八个上装模块 · 点击下方与右侧标签，自由组合出你的巡检配置</p>
+      </div>
+
+      <!-- part-5 header, swapped in when the page shifts to AI mode -->
+      <div class="ai-head" id="aiHead">
+        <div class="eyebrow2" style="margin-bottom:8px;"><span class="eb-tick"></span><span data-en="SOFTWARE · AI Inspections">SOFTWARE · AI 巡检</span></div>
+        <h2 class="g-title"><span data-en="Four groups of ">四组 </span><span class="accent" data-en="AI inspection capability">AI 巡检能力</span></h2>
+        <p class="g-hint" data-en="Capability groups are orbiting the robot · click one to unfold its list">能力组正环绕机体待命 · 点击一组，展开它的能力清单</p>
+      </div>
+
+      <div class="g-rig">
+        <!-- left: live spec card -->
+        <aside class="g-spec" id="gSpec">
+          <span class="prod-corner tl"></span><span class="prod-corner br"></span>
+          <span class="gs-kind" id="gsKind">机器人 · 本体</span>
+          <h3 class="gs-name" id="gsName">X30</h3>
+          <div class="gs-form" id="gsForm"></div>
+          <p class="gs-role" id="gsRole"></p>
+          <div class="gs-rule"></div>
+          <div id="gsBody"></div>
+          <div class="gs-foot" id="gsFoot"></div>
+        </aside>
+
+        <!-- center: stage -->
+        <div class="g-stage">
+          <svg class="g-platform" viewBox="0 0 520 120" aria-hidden="true">
+            <ellipse cx="260" cy="60" rx="250" ry="52" fill="none" stroke="rgba(55,224,242,.26)" stroke-width="1"/>
+            <ellipse cx="260" cy="60" rx="196" ry="40" fill="none" stroke="rgba(120,150,190,.15)" stroke-width="1" stroke-dasharray="3 6"/>
+            <ellipse cx="260" cy="60" rx="118" ry="23" fill="rgba(55,224,242,.05)" stroke="rgba(55,224,242,.15)"/>
+            <path d="M260,2 v10 M260,108 v10 M4,60 h12 M504,60 h12" stroke="rgba(55,224,242,.4)" stroke-width="1"/>
+          </svg>
+          <div class="g-dogwrap" id="gDogWrap">
+            <div class="g-plate"><img id="gDogImg" src="assets/x30.jpg" alt="机器狗"><span class="sf-scan"></span><span class="sf-cnr tl"></span><span class="sf-cnr br"></span></div>
+            <div class="g-shadow"></div>
+          </div>
+          <svg id="gLink" aria-hidden="true"></svg>
+          <div class="g-modcard" id="gModCard">
+            <span class="pip-cnr tl"></span><span class="pip-cnr br"></span>
+            <div class="imgbox" id="gModBox"></div>
+            <b id="gModName"></b>
+          </div>
+
+          <!-- part 5: orbiting capability groups + quick list -->
+          <div class="ai-minihead"><span class="eb-tick"></span><span data-en="SOFTWARE · AI Inspections">SOFTWARE · AI 巡检能力</span></div>
+          <div id="aiOrbit"></div>
+          <div class="ai-menu" id="aiMenu"></div>
+          <button class="ai-return" id="aiReturn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3v4h-4"/></svg><span data-en="Back to Orbit">返回环绕</span></button>
+        </div>
+
+        <!-- part-5 detail cards live at the RIG edges (the columns parts-4
+             furniture vacated), not crowded around the dog -->
+        <aside class="ai-card ai-left" id="aiLeft">
+          <span class="pip-cnr tl"></span><span class="pip-cnr br"></span>
+          <button class="pip-x ai-x" id="aiX" aria-label="收起">×</button>
+          <div class="ai-cat" id="aiCatLbl"></div>
+          <h4 class="ai-name" id="aiName"></h4>
+          <p class="ai-desc" id="aiDesc"></p>
+          <ul class="ai-dets" id="aiDets"></ul>
+        </aside>
+        <aside class="ai-card ai-right" id="aiRight">
+          <span class="pip-cnr tl"></span><span class="pip-cnr br"></span>
+          <div class="ai-imgbox"><img id="aiImg" alt=""><span class="sf-scan"></span></div>
+          <div class="ai-chips" id="aiChips"></div>
+        </aside>
+
+        <!-- right: payload rail -->
+        <div class="g-mods-col">
+          <button class="g-tab" id="tabMods"><span data-en="Configurable Payload Modules">可配置上装模块</span><i>08</i></button>
+          <div class="g-panel g-modpanel" id="modPanel"><div class="g-modlist" id="modList"></div></div>
+        </div>
+
+        <!-- bottom: dog dock -->
+        <div class="g-dock">
+          <button class="g-tab" id="tabDogs"><span data-en="Adaptable Robots">可适配机器狗</span><i>03</i></button>
+          <div class="g-panel g-dogpanel" id="dogPanel"><div class="g-carousel" id="dogCar"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div><!-- /garageWrap -->
+
+  <!-- ===== part 6: process + platform — keynote bento page ===== -->
+  <div id="bentoWrap">
+  <section id="platform" class="sec sec-bento">
+    <div class="sec-inner">
+      <div class="g-head">
+        <div class="eyebrow2"><span class="eb-tick"></span><span data-en="PLATFORM · Process &amp; Platform">PLATFORM · 巡检流程与平台</span></div>
+        <h2 class="g-title"><span data-en="Survey to charging, ">从选点到回充，</span><span class="accent" data-en="one closed loop">一个闭环</span></h2>
+        <p class="g-hint" data-en="A five-step loop runs itself · the platform schedules, tracks and audits">五步流程自动循环 · 智能巡检平台统一调度、统计与追溯</p>
+      </div>
+      <div class="bento">
+        <div class="bt bt-img bt-hero"><img src="assets/plat-live.jpg" alt=""><b data-en="Control Center · Real-Time Video &amp; Thermal">控制中心 · 实时视频与热成像</b></div>
+        <div class="bt bt-img bt-risk"><img src="assets/plat-risk.jpg" alt=""><b data-en="Risk Analysis · Trends &amp; Alert Distribution">风险分析 · 趋势与告警分布</b></div>
+        <div class="bt bt-stat bt-stat1"><i>DASHBOARD</i><strong>7×24</strong>
+          <p data-en="Data statistics and task boards">数据统计与任务看板</p>
+          <div class="bt-chips"><b data-en="Tasks">任务</b><b data-en="Alerts">告警</b><b data-en="Points">点位</b><b data-en="Indicators">指标</b></div></div>
+        <div class="bt bt-stat bt-stat2"><i>INTEGRATION</i><strong>MQTT<em> / </em>HTTP</strong>
+          <p data-en="Enterprise system integration — work orders, assets, alerts">企业系统集成，对接工单、资产与告警系统</p></div>
+        <div class="bento-wf"><i data-en="WORKFLOW · Closed-Loop Inspection Process">WORKFLOW · 五步巡检闭环</i></div>
+        <div class="bt bt-step bt-s1">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M12 2v4 M12 18v4 M2 12h4 M18 12h4"/><circle cx="12" cy="12" r="1.6"/></svg>
+          <i>01</i><b data-en="Site Survey">选点勘察</b><p data-en="Survey the site, define routes, checkpoints, network conditions, and charging position.">勘察现场，确定路线、点位、网络与充电桩位置。</p></div>
+        <div class="bt bt-step bt-s2">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16 M4 12h16 M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="17" r="2"/></svg>
+          <i>02</i><b data-en="Deploy Tasks">部署任务</b><p data-en="Configure inspection points, schedules, payload rules, thresholds, and reporting requirements.">配置点位、排班、上装规则、阈值与报告要求。</p></div>
+        <div class="bt bt-step bt-s3">
+          <svg viewBox="0 0 24 24"><path d="M4 19c5 0 3-12 8-12 4 0 3 9 8 9"/><circle cx="4" cy="19" r="1.8"/><circle cx="12" cy="7" r="1.8"/><circle cx="20" cy="16" r="1.8"/></svg>
+          <i>03</i><b data-en="Autonomous Patrol">自主巡检</b><p data-en="The robot follows planned routes and checks inspection points in real time.">机器人沿规划路线实时巡检各点位。</p></div>
+        <div class="bt bt-step bt-s4">
+          <svg viewBox="0 0 24 24"><path d="M12 16V5 M8 9l4-4 4 4"/><path d="M4 15v4h16v-4"/></svg>
+          <i>04</i><b data-en="Report Upload">上报报告</b><p data-en="Inspection results are uploaded to generate alerts, records, and site reports.">结果上传，生成告警、记录与现场报告。</p></div>
+        <div class="bt bt-step bt-s5">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="16" height="9" rx="2"/><path d="M19 11h2v3h-2"/><path d="M11 9.5 9 13h3l-2 3.5"/></svg>
+          <i>05</i><b data-en="Autonomous Charging">自主回充</b><p data-en="The robot returns to its charging station and prepares for the next cycle.">返回充电桩，准备下一轮巡检。</p></div>
+        <div class="bt bt-loop">
+          <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 3v4h-4"/></svg>
+          <b data-en="Autonomous Loop">自主闭环</b><p data-en="Recharged and ready, the next cycle starts automatically.">回充完成后自动进入下一轮，周而复始。</p></div>
+      </div>
+    </div>
+  </section>
+  </div><!-- /bentoWrap -->
+
+  <!-- ===== contact ===== -->
+  <section id="contact" class="sec sec-contact">
+    <div class="sec-inner contact-grid">
+      <div class="contact-lead" data-reveal>
+        <div class="eyebrow2"><span class="eb-tick"></span><span data-en="CONTACT · Contact &amp; Demo">CONTACT · 联系与演示</span></div>
+        <h2 class="sec-title"><span data-en="Discuss a Deployment ">沟通部署</span><span class="accent" data-en="or Partnership">或合作</span></h2>
+        <dl class="clead-rows">
+          <div><dt data-en="Phone">电话</dt><dd><a href="tel:+8615336537763">+86 15336537763</a></dd></div>
+          <div><dt data-en="Email">邮箱</dt><dd><a href="mailto:bd@davinci-bot.com">bd@davinci-bot.com</a> /<br><a href="mailto:davincirobotics.bd@gmail.com">davincirobotics.bd@gmail.com</a></dd></div>
+          <div><dt data-en="Address">地址</dt><dd class="t" data-en-html="Room 901, Hi+ Camp, 172 Yugu Road, Xihu District, Hangzhou, China<br>6A08, 6/F, Shengjie Building, Futian District, Shenzhen, China">中国杭州西湖区玉古路 172 号杭创营 901 室<br>深圳市福田区胜捷大厦 6 楼 6A08</dd></div>
+        </dl>
+        <div class="socials">
+          <a class="soc" href="https://www.linkedin.com/company/111597932/" target="_blank" rel="noopener" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05C20.2 8.65 21 11 21 14.1V21h-4v-6.1c0-1.45-.03-3.3-2-3.3s-2.3 1.55-2.3 3.2V21H9z"/></svg></a>
+          <a class="soc" href="https://www.tiktok.com/@davinci_robotics" target="_blank" rel="noopener" aria-label="TikTok">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M16.5 3c.4 2.1 1.8 3.6 4 3.9v3.1c-1.5.1-2.9-.4-4-1.2v6.6c0 4-2.8 6.1-5.7 6.1A5.6 5.6 0 0 1 5 15.9c0-3.3 2.7-5.8 6.2-5.5v3.2c-1.7-.3-3 .7-3 2.3 0 1.4 1.1 2.4 2.5 2.4 1.6 0 2.7-1.2 2.7-3.1V3h3.1z"/></svg></a>
+          <a class="soc" href="https://x.com/davincirobotic" target="_blank" rel="noopener" aria-label="X">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M3 3h4.6l4.3 6.1L17.2 3H21l-7 8.1L21.4 21h-4.6l-4.7-6.6L6.3 21H2.6l7.4-8.6z"/></svg></a>
+          <a class="soc soc-red" href="https://www.xiaohongshu.com/user/profile/617d813100000000020201c9" target="_blank" rel="noopener" aria-label="小红书">RED</a>
+        </div>
+      </div>
+
+      <!-- lead form — same live backend as the original site (formsubmit.co) -->
+      <form class="lead-form" id="leadForm" data-reveal action="https://formsubmit.co/bd@davinci-bot.com" method="POST">
+        <input type="hidden" name="_subject" value="New Da Vinci Robotics website inquiry">
+        <input type="hidden" name="_template" value="table">
+        <input type="hidden" name="_captcha" value="false">
+        <input type="hidden" name="_next" value="https://davinci-bot.ai/#contact">
+        <div class="lf-row">
+          <label><span data-en="Name">姓名</span><input type="text" name="姓名" placeholder="您的称呼" data-en-ph="Your name" required></label>
+          <label><span data-en="Company">公司</span><input type="text" name="公司" placeholder="企业名称" data-en-ph="Company name"></label>
+        </div>
+        <div class="lf-row">
+          <label><span data-en="Contact">联系</span><input type="text" name="联系方式" placeholder="手机或邮箱" data-en-ph="Phone or email" required></label>
+          <label><span data-en="Scenario">场景</span>
+            <select name="场景">
+              <option value="" data-en="Please select">请选择</option><option data-en="Cooperation">合作</option><option data-en="Grain Storage">粮仓储存</option>
+              <option data-en="Campus / Secure Facilities">园区与安防</option><option data-en="Semiconductor">半导体</option><option data-en="Energy">能源</option>
+              <option data-en="Factory &amp; Industrial Parks">工厂与产业园区</option><option data-en="Data Center">数据中心</option><option data-en="Other">其他</option>
+            </select></label>
+        </div>
+        <label class="lf-full"><span data-en="Brief Requirement / Cooperation Interest">简要需求 / 合作意向</span>
+          <textarea name="需求" rows="5" placeholder="例如：3 号厂房有 40 块压力表，希望每 2 小时巡一次。也可以说明您希望在哪些方面合作。" data-en-ph="e.g., Building 3 has 40 pressure gauges to check every 2 hours. Or tell us how you would like to cooperate."></textarea></label>
+        <button class="cta-big lf-submit" type="submit"><span data-en="Submit Request ">提交需求 </span><span>→</span></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== footer ===== -->
+  <footer class="sitefoot">
+    <div class="foot-inner">
+      <div class="foot-brand">
+        <img src="assets/logo.png" alt="Da Vinci Robotics">
+        <span data-en="Autonomous Inspection Experts">自主巡检专家</span>
+      </div>
+      <div class="foot-meta"><b>© 2026 Da Vinci Robotics</b><br>Hangzhou · Shenzhen · davinci-bot.ai</div>
+    </div>
+  </footer>
+</div>
+
+
+<!--__INLINE__-->
+
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ===== i18n: zh (default) / en — EN copy is the original site's own text ===== */
+let LANG=(function(){try{return sessionStorage.getItem('dvlang')||'zh';}catch(e){return 'zh';}})();
+const L=v=>(v&&typeof v==='object')?(LANG==='en'?v.en:v.zh):v;
+
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:location.search.indexOf('cap')>=0});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x03060c,1);
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x06121f,0.016);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,0.1,400);
+
+/* ---------- gradient haze backdrop ---------- */
+const bgU={cTop:{value:new THREE.Color(0x0a1626)},cBot:{value:new THREE.Color(0x03070e)},cGlow:{value:new THREE.Color(0x1a4e88)},glow:{value:0.34},t:{value:0}};
+const bg=new THREE.Mesh(new THREE.SphereGeometry(200,32,24),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:bgU,
+ vertexShader:`varying vec3 v;void main(){v=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+ fragmentShader:`uniform vec3 cTop,cBot,cGlow;uniform float glow,t;varying vec3 v;
+  void main(){vec3 n=normalize(v);float h=n.y*0.5+0.5;
+   vec3 col=mix(cBot,cTop,smoothstep(0.0,1.0,h));
+   float g=1.0-length(n.xy-vec2(0.0,-0.05));
+   col+=cGlow*glow*smoothstep(0.3,1.0,g);
+   col+=cGlow*0.04*sin(h*30.0+t*0.3);
+   gl_FragColor=vec4(col,1.0);}`}));
+scene.add(bg);
+
+/* ---------- forward-flowing route motes (semantic: planned path) ----------
+   Particles distributed in a long thin tube along +Z. They flow toward camera
+   start, reading as a directional "route stream". In tunnel phase they get
+   pulled onto ring radii. */
+const N=2400;
+const g=new THREE.BufferGeometry();
+const P=new Float32Array(N*3), SEED=new Float32Array(N), ANG=new Float32Array(N), RAD=new Float32Array(N);
+const CORRIDOR_LEN=260;
+for(let i=0;i<N;i++){
+  const a=Math.random()*Math.PI*2, r=Math.pow(Math.random(),0.5)*3.2;
+  ANG[i]=a; RAD[i]=r; SEED[i]=Math.random();
+  P[i*3]=Math.cos(a)*r; P[i*3+1]=Math.sin(a)*r*0.7; P[i*3+2]=-Math.random()*CORRIDOR_LEN;
+}
+g.setAttribute('position',new THREE.BufferAttribute(P,3));
+g.setAttribute('seed',new THREE.BufferAttribute(SEED,1));
+g.setAttribute('ang',new THREE.BufferAttribute(ANG,1));
+g.setAttribute('rad',new THREE.BufferAttribute(RAD,1));
+const pU={t:{value:0},uColor:{value:new THREE.Color(0x6fd8ff)},uTunnel:{value:0},uCamZ:{value:0},uDPR:{value:Math.min(devicePixelRatio,2)},uLen:{value:CORRIDOR_LEN},uFade:{value:1},uWarp:{value:0},uRel:{value:0}};
+const motes=new THREE.Points(g,new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:pU,
+ vertexShader:`uniform float t,uTunnel,uCamZ,uDPR,uLen,uFade,uWarp,uRel;attribute float seed,ang,rad;varying float vA;
+  void main(){
+    vec3 p=position;
+    // Recycle each mote into a corridor of length uLen that sits JUST AHEAD of the
+    // camera (camZ = -uCamZ; worldZ = camZ - phase), so the field can never be
+    // outrun. Flow speeds up inside the tunnel (穿梭感) and surges under uWarp.
+    float phase=mod(p.z + t*(6.0 + uTunnel*8.0 + uWarp*34.0) + uCamZ, uLen);
+    p.z = -uCamZ - phase;
+    // tunnel field: each mote owns its own radius across the whole bore (2.1-5.4,
+    // wall is at 6) so the stream FILLS the frame and streaks past the camera edge
+    // instead of huddling in a small core knot. uRel blows the field outward for
+    // the release into the scene section.
+    float bore=2.1 + seed*3.3 + sin(phase*0.15 + t*0.5 + seed*9.0)*0.35;
+    float tr=mix(rad, bore, uTunnel)*(1.0 + uRel*1.25);
+    p.x=cos(ang)*tr;
+    p.y=sin(ang)*tr*mix(0.7,1.0,uTunnel);
+    // gentle drift in hero phase
+    p.x+=cos(t*0.2+seed*20.0)*0.15*(1.0-uTunnel);
+    p.y+=sin(t*0.25+seed*24.0)*0.15*(1.0-uTunnel);
+    vec4 mv=modelViewMatrix*vec4(p,1.0);
+    float size=(1.6+seed*5.0)*uDPR*mix(1.0,1.8,uTunnel)*(1.0+uWarp*1.4);
+    gl_PointSize=size*(60.0/max(-mv.z,1.0));
+    gl_Position=projectionMatrix*mv;
+    float dist=-mv.z;
+    // gradual far fade across the WHOLE corridor depth (no hard cut at mid)
+    float far=smoothstep(uLen*0.95, uLen*0.30, dist);
+    // soft near fade; in tunnel let motes get closer before fading so they whoosh
+    // past the screen edges instead of dying politely mid-frame
+    float near=smoothstep(mix(2.0,1.2,uTunnel), mix(10.0,5.0,uTunnel), dist);
+    // gentle twinkle for life
+    float tw=0.7+0.3*sin(t*1.4+seed*40.0);
+    // staggered de-rez dissolve: as uFade drops, motes wink out one by one (seed-
+    // offset) rather than dimming uniformly — reads digital, not like a fade knob
+    float fad=clamp(uFade*1.25 - seed*0.25, 0.0, 1.0);
+    vA=far*near*(0.28+0.72*seed)*tw*fad;
+  }`,
+ fragmentShader:`uniform vec3 uColor;varying float vA;
+  void main(){vec2 d=gl_PointCoord-0.5;float r=length(d);
+   float core=smoothstep(0.5,0.0,r);
+   float glow=smoothstep(0.5,0.12,r)*0.6;
+   gl_FragColor=vec4(uColor,(core*0.7+glow)*vA);}`}));
+// The mote field is displaced entirely in the vertex shader, so THREE's frustum
+// cull (based on the STATIC initial bounding sphere at z∈[-260,0]) wrongly discards
+// the whole object once the camera travels past z≈-260 — which is exactly where the
+// particles used to die, right after the first beat. Disable culling; visibility is
+// handled per-particle by the shader's near/far fade + uFade.
+motes.frustumCulled=false;
+scene.add(motes);
+
+/* ---------- waypoint guide-line (semantic: checkpoints on the route) ---------- */
+const WPN=14;
+const wpGroup=new THREE.Group();
+const wpMat=new THREE.MeshBasicMaterial({color:0x9fe8ff,transparent:true,opacity:0});
+for(let i=0;i<WPN;i++){
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.32,0.4,32),wpMat.clone());
+  ring.position.z=-i*16-6;
+  wpGroup.add(ring);
+}
+scene.add(wpGroup);
+
+/* ---------- contracting tunnel rings (semantic: descending into culvert) ---------- */
+const RINGN=26;
+const ringGroup=new THREE.Group();
+const ringMat=new THREE.MeshBasicMaterial({color:0x7fe0d8,transparent:true,opacity:0,side:THREE.DoubleSide,wireframe:false});
+for(let i=0;i<RINGN;i++){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(3.0,0.018,8,48),ringMat.clone());
+  ring.position.z=-i*7-4;
+  ringGroup.add(ring);
+}
+scene.add(ringGroup);
+
+/* ---------- tunnel wall (auxiliary photo mapped on cylinder interior) ---------- */
+const tex=new THREE.TextureLoader().load('assets/tunnel.jpg');
+tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(3,2);
+const wallMat=new THREE.MeshBasicMaterial({map:tex,side:THREE.BackSide,transparent:true,opacity:0,color:0x6f8aa0});
+const wall=new THREE.Mesh(new THREE.CylinderGeometry(6,6,200,48,1,true),wallMat);
+wall.rotation.x=Math.PI/2; wall.position.z=-100;
+scene.add(wall);
+
+/* ---------- lights (for any standard materials / subtle) ---------- */
+scene.add(new THREE.AmbientLight(0x6688aa,0.6));
+
+/* ---------- scroll-driven state machine ---------- */
+const dog=document.getElementById('dog');
+const c1=document.getElementById('c1');
+const hint=document.getElementById('hint');
+/* ===== rotating capability carousel: auto + swipe + dots ===== */
+const CARDS=[
+  {n:'01',t:{zh:'路线规划',en:'Route Planning'},s:{zh:'点位 · 排班 · 上装规则',en:'Checkpoints · Schedules · Payload Rules'}},
+  {n:'02',t:{zh:'机器人实时巡检',en:'Real-Time Robot Patrol'},s:{zh:'视频 · 热成像 · 环境数据',en:'Video · Thermal · Environmental Data'}},
+  {n:'03',t:{zh:'AI 检测',en:'AI Detection'},s:{zh:'烟雾 · 入侵 · 仪表读数',en:'Smoke · Intrusion · Meter Readings'}},
+  {n:'04',t:{zh:'证据报告',en:'Evidence Report'},s:{zh:'告警 · 工单 · 审计记录',en:'Alerts · Work Orders · Audit Records'}},
+];
+const cardN=document.getElementById('cardN'),cardT=document.getElementById('cardT'),cardS=document.getElementById('cardS');
+const cardBody=document.querySelector('.card-body'),cardDots=document.getElementById('cardDots'),cardRail=document.getElementById('cardRail');
+let ci=0, cTimer=null;
+CARDS.forEach((_,i)=>{const b=document.createElement('b');b.onclick=()=>{goCard(i);restart();};cardDots.appendChild(b);});
+const cDots=[...cardDots.children];
+function renderCard(){
+  cardBody.classList.add('swap');
+  setTimeout(()=>{
+    const c=CARDS[ci];
+    cardN.textContent=c.n;cardT.textContent=L(c.t);cardS.textContent=L(c.s);
+    cDots.forEach((d,i)=>d.classList.toggle('on',i===ci));
+    cardBody.classList.remove('swap');
+  },220);
+}
+function goCard(i){ci=(i+CARDS.length)%CARDS.length;renderCard();}
+function nextCard(){goCard(ci+1);}
+function restart(){clearInterval(cTimer);cTimer=setInterval(nextCard,3200);}
+renderCard();restart();
+// swipe (touch) + drag (mouse) on the rail
+let sx=null;
+function dStart(x){sx=x;clearInterval(cTimer);}
+function dEnd(x){if(sx===null)return;const dx=x-sx;if(Math.abs(dx)>40){dx<0?nextCard():goCard(ci-1);}sx=null;restart();}
+cardRail.addEventListener('touchstart',e=>dStart(e.touches[0].clientX),{passive:true});
+cardRail.addEventListener('touchend',e=>dEnd(e.changedTouches[0].clientX),{passive:true});
+cardRail.addEventListener('mousedown',e=>dStart(e.clientX));
+window.addEventListener('mouseup',e=>{if(sx!==null)dEnd(e.clientX);});
+cardRail.addEventListener('mouseenter',()=>clearInterval(cTimer));
+cardRail.addEventListener('mouseleave',()=>restart());
+let mx=0,my=0;
+addEventListener('pointermove',e=>{mx=e.clientX/innerWidth-0.5;my=e.clientY/innerHeight-0.5;});
+
+/* ===== board 1: the four "Inspection Scenarios" from the original site =====
+   Each has a demo VIDEO (hotlinked from davinci-bot.ai) + the full detail copy
+   (intro + four feature points). Posters are the inlined local photos, and if a
+   video fails to load we fall back to the poster image. */
+const VIDBASE='https://davinci-bot.ai/davinci_ai_assets/';
+const SCENES=[
+  {side:'left', area:{zh:'场景 · 粮库',en:'Scene · Grain Depot'}, title:{zh:'粮仓储存',en:'Grain Storage'},
+   video:VIDBASE+'grain-storage-demo.mp4', poster:'assets/grain.jpg',
+   desc:{zh:'机器狗深入仓储路线巡检,采集温湿度与烟雾火险信号,记录路线与点位证据,为粮仓运营提供可追溯的巡检依据。',
+         en:'Da Vinci supports grain storage patrols with robot dog mobility, temperature and humidity checks, smoke and fire awareness, route records, and inspection evidence for warehouse operations.'},
+   points:[[{zh:'环境检查',en:'Environment Checks'},{zh:'沿仓储路线跟踪温度、湿度、烟雾与可见异常状况。',en:'Track temperature, humidity, smoke, and visible abnormal conditions across warehouse routes.'}],
+           [{zh:'路线证据',en:'Route Evidence'},{zh:'记录巡检路线、点位图像、时间戳与复核结果,运营全程可追溯。',en:'Record patrol route, checkpoint images, timestamps, and review results for traceable operations.'}],
+           [{zh:'AI 巡检',en:'AI Inspection'},{zh:'支持温湿度检查、烟雾与火险识别、可见残留复查与异常告警。',en:'Temperature and humidity checks, smoke and fire-risk recognition, visible residue review, and alerts.'}],
+           [{zh:'风险响应',en:'Risk Response'},{zh:'对烟雾、火险场景、异常残留及需人工复核的状况触发告警。',en:'Trigger alerts for smoke, fire-risk scenes, abnormal residue, and conditions requiring review.'}]]},
+  {side:'right',area:{zh:'场景 · 园区停车区',en:'Scene · Campus Parking'}, title:{zh:'停车区巡逻',en:'Parking Area'},
+   video:VIDBASE+'parking-garage-patrol.mp4', poster:'assets/park.jpg',
+   desc:{zh:'面向园区安防与停车区巡逻,机器人执行点位巡检、受控区检测与车辆检查,留存夜巡记录与事件证据。',
+         en:'Da Vinci supports campus security and parking-area patrols with checkpoint inspection, restricted-area detection, vehicle checks, night patrol records, and incident evidence.'},
+   points:[[{zh:'停车区巡检',en:'Parking Area Patrol'},{zh:'巡查停车通道、车库路线、充电车位与异常占用。',en:'Inspect parking aisles, garage routes, EV charging spaces, and abnormal vehicle occupancy.'}],
+           [{zh:'受控区复核',en:'Restricted Area Review'},{zh:'检测受控区域与出入口周边的入侵、异常停留与通行事件。',en:'Detect intrusion, abnormal stay, and access events around controlled areas or gates.'}],
+           [{zh:'夜巡证据',en:'Night Patrol Evidence'},{zh:'采集路线视频、点位图像与时间戳,供安防复核。',en:'Capture route videos, checkpoint images, and timestamps for security review.'}],
+           [{zh:'事件响应',en:'Incident Response'},{zh:'向值守人员推送告警与视觉证据,支持核实与跟进处置。',en:'Push alerts and visual evidence to operators for verification and follow-up.'}]]},
+  {side:'left', area:{zh:'场景 · 能源尾矿',en:'Scene · Energy & Tailings'}, title:{zh:'尾矿涵洞',en:'Tailings Culvert'},
+   video:VIDBASE+'energy-tailings-culvert-demo.mp4', poster:'assets/culvert.jpg',
+   desc:{zh:'面向能源、矿山与尾矿库现场,机器人代替人工进入涵洞、管廊、偏远路线与危险区域,完成高风险环境的巡检。',
+         en:'For energy, mining, and tailings sites, Da Vinci supports robot patrols in culverts, utility corridors, remote routes, and hazardous areas where manual inspection is difficult or risky.'},
+   points:[[{zh:'涵洞路线巡检',en:'Culvert Route Patrol'},{zh:'巡查封闭与半封闭的尾矿涵洞路线,留存机器人视频证据。',en:'Inspect enclosed or semi-enclosed tailings culvert routes with robot video evidence.'}],
+           [{zh:'降低人员风险',en:'Hazard Reduction'},{zh:'减少人工进入受限、偏远或不稳定的巡检环境。',en:'Reduce manual entry into confined, remote, or unstable inspection environments.'}],
+           [{zh:'状况记录',en:'Condition Records'},{zh:'采集积水、障碍、结构表面状况与路线级异常。',en:'Capture water accumulation, obstacles, structural surface conditions, and route anomalies.'}],
+           [{zh:'远程复核',en:'Remote Review'},{zh:'上传视频、图像、告警与路线记录,供集控集中核实。',en:'Upload video, images, alerts, and route records for centralized operator verification.'}]]},
+  {side:'right',area:{zh:'场景 · 关键 IT 设施',en:'Scene · Critical IT Facilities'}, title:{zh:'数据中心',en:'Data Center'},
+   video:VIDBASE+'data-center-demo.mp4', poster:'assets/datacenter.jpg',
+   desc:{zh:'机器人 7×24 移动巡检,结合热成像、OCR 与环境感知,覆盖机房、设备间、UPS 间与机柜通道,输出可审计的巡检报告。',
+         en:'Da Vinci combines robot patrol, thermal imaging, OCR, environmental sensing, and inspection reports for data centers, equipment rooms, UPS rooms, and cabinet corridors.'},
+   points:[[{zh:'机柜与通道检查',en:'Cabinet & Aisle Checks'},{zh:'沿固定路线巡查机柜门、标签、通道与可见异常状态。',en:'Inspect cabinet doors, labels, corridor access, and visible abnormal states along fixed routes.'}],
+           [{zh:'热风险复核',en:'Thermal Risk Review'},{zh:'借助热成像上装,及早发现机架、配电与制冷区域的热点。',en:'Use thermal payloads for early discovery of hot spots around racks, power, and cooling areas.'}],
+           [{zh:'资产记录',en:'Asset Records'},{zh:'采集 QR/RFID 标签、序列号与机架位置,供 CMDB / DCIM 复核。',en:'Capture QR/RFID tags, serial numbers, and rack position evidence for CMDB or DCIM review.'}],
+           [{zh:'巡检报告',en:'Inspection Reports'},{zh:'生成路线记录、图像、告警与月度证据,服务运维与审计。',en:'Generate route records, images, alerts, and monthly evidence for operations and audit teams.'}]]},
+];
+/* ===== FIELD MAP: interactive site plan with scenario anchors ===== */
+const fieldMap=document.getElementById('fieldMap');
+const mpStage=document.getElementById('mpStage');
+const mlink=document.getElementById('mlink');
+const solGrid=document.getElementById('solGrid');
+const pip=document.getElementById('pip');
+const pipIdx=document.getElementById('pipIdx'),pipArea=document.getElementById('pipArea'),
+      pipTitle=document.getElementById('pipTitle'),pipDesc=document.getElementById('pipDesc'),
+      pipPoints=document.getElementById('pipPoints'),pipVid=document.getElementById('pipVid'),
+      pipImg=document.getElementById('pipImg');
+// topographic field, deterministic: CLOSED ring contours around three rises
+// (proper 等高线 look — the NE one wraps the tailings pond) plus a few gentle
+// open flow lines for the plains between them. Outermost ring = index contour.
+(function genContours(){
+  const g=document.getElementById('mpContours');
+  let html='';
+  const HILLS=[
+    {cx:820,cy:140,rx:1.25,ry:0.80,n:5,r0:34,step:27,ph:0.7},
+    {cx:105,cy:295,rx:1.10,ry:0.90,n:4,r0:30,step:26,ph:2.1},
+    {cx:545,cy:505,rx:1.35,ry:0.70,n:3,r0:26,step:24,ph:4.2},
+  ];
+  HILLS.forEach(h=>{
+    for(let k=0;k<h.n;k++){
+      const base=h.r0+k*h.step;
+      let d='';
+      for(let a=0;a<=360;a+=12){
+        const t=a*Math.PI/180;
+        const r=base*(1+0.14*Math.sin(3*t+h.ph+k*0.5)+0.07*Math.sin(5*t+h.ph*1.7));
+        const x=h.cx+Math.cos(t)*r*h.rx, y=h.cy+Math.sin(t)*r*h.ry;
+        d+=(a===0?'M':'L')+x.toFixed(1)+' '+y.toFixed(1);
+      }
+      html+='<path d="'+d+'Z"'+(k===h.n-1?' class="idx"':'')+'/>';
+    }
+  });
+  for(let b=0;b<4;b++){
+    const y0=95+b*125;
+    let d='M -60 '+y0;
+    for(let x=-60;x<=1060;x+=32){
+      const y=y0+16*Math.sin(x*0.005+b*1.9)+7*Math.sin(x*0.013+b*0.8);
+      d+=' L '+x+' '+y.toFixed(1);
+    }
+    html+='<path d="'+d+'"/>';
+  }
+  g.innerHTML=html;
+})();
+// anchor positions in map (viewBox 1000x560) coordinates, matched to the drawn zones
+const MAP_ANCHORS=[
+  {k:0,x:190,y:140},   // 粮库区 warehouse
+  {k:1,x:200,y:435},   // 停车区 structure
+  {k:2,x:790,y:120},   // 尾矿库 pond
+  {k:3,x:760,y:415},   // 数据中心 halls
+  {k:'more',x:497,y:318}, // 控制中心下方 — the remaining-solutions matrix
+];
+const MORE_LBL={zh:'更多巡检场景',en:'More Scenarios'};
+const anchorEls=MAP_ANCHORS.map((a,ai)=>{
+  const more=a.k==='more';
+  const el=document.createElement('button');
+  el.className='mpa'+(more?' mpa-more':'')+(a.x>640?' flip':'');
+  const t=more?MORE_LBL:SCENES[a.k].title;
+  const idx=more?'05+':String(a.k+1).padStart(2,'0');
+  el.innerHTML=`<span class="mpa-dot"></span><b><i>${idx}</i><span data-en="${t.en}">${t.zh}</span></b>`+
+    (ai===0?'<span class="mpa-hint" id="mpaHint" data-en="Click to view ▾">点击查看 ▾</span>':'');
+  el.addEventListener('click',e=>{e.stopPropagation();more?openGrid(el):openPip(a.k,el);});
+  el.style.transitionDelay=(0.1+ai*0.09).toFixed(2)+'s';   // staggered arrival
+  mpStage.appendChild(el);
+  return el;
+});
+// place anchors over the sliced (cover-fitted) SVG: same math as xMidYMid slice.
+// MUST use offsetWidth/offsetHeight (layout box) — getBoundingClientRect returns
+// the TRANSFORMED box, and this runs while the entry zoom (scale up to 2.6) is
+// still on the stage, which previously threw every anchor off the map.
+function placeAnchors(){
+  const w=mpStage.offsetWidth, h=mpStage.offsetHeight;
+  if(w<10||h<10)return;
+  const s=Math.max(w/1000,h/560);
+  const ox=(w-1000*s)/2, oy=(h-560*s)/2;
+  MAP_ANCHORS.forEach((a,i)=>{
+    anchorEls[i].style.left=(ox+a.x*s).toFixed(1)+'px';
+    anchorEls[i].style.top =(oy+a.y*s).toFixed(1)+'px';
+  });
+}
+placeAnchors();
+addEventListener('resize',placeAnchors);
+// mobile: chip list mirrors the anchors (labels hidden on the small map)
+const mpChips=document.getElementById('mpChips');
+MAP_ANCHORS.forEach(a=>{
+  const more=a.k==='more';
+  const t=more?MORE_LBL:SCENES[a.k].title;
+  const b=document.createElement('button');
+  b.innerHTML=`<i>${more?'05+':String(a.k+1).padStart(2,'0')}</i><span data-en="${t.en}">${t.zh}</span>`;
+  b.addEventListener('click',()=>more?openGrid(b):openPip(a.k,b));
+  mpChips.appendChild(b);
+});
+let hintDone=false;
+function killHint(){if(hintDone)return;hintDone=true;const h=document.getElementById('mpaHint');if(h)h.remove();}
+// PCB link from the clicked anchor to the opened panel (the "机工" tether)
+function drawLink(fromEl,toEl){
+  const fm=fieldMap.getBoundingClientRect();
+  const a=fromEl.getBoundingClientRect(), b=toEl.getBoundingClientRect();
+  const ax=a.left+a.width/2-fm.left, ay=a.top+a.height/2-fm.top;
+  const toRight=(b.left+b.width/2)>ax;
+  const px=(toRight?b.left:b.right)-fm.left;
+  const py=Math.max(b.top+24,Math.min(ay,b.top+b.height-24))-fm.top;
+  const mx=px+(toRight?-34:34);
+  const d=`M ${ax} ${ay} L ${mx} ${ay} L ${mx} ${py} L ${px} ${py}`;
+  mlink.setAttribute('viewBox',`0 0 ${fm.width} ${fm.height}`);
+  mlink.innerHTML=`<path class="ct-base" d="${d}"/><path class="ct-flow" d="${d}"/>`+
+    `<circle class="ct-node" cx="${ax}" cy="${ay}" r="3"/>`+
+    `<circle class="ct-node" cx="${mx}" cy="${py}" r="2"/>`+
+    `<circle class="ct-node" cx="${px}" cy="${py}" r="2.6"/>`;
+}
+let pipOpenK=-1;
+function openPip(k,fromEl){
+  killHint(); closeGrid();
+  const s=SCENES[k]; pipOpenK=k;
+  anchorEls.forEach((el,i)=>el.classList.toggle('sel',MAP_ANCHORS[i].k===k));
+  pipIdx.textContent=String(k+1).padStart(2,'0')+' / 04';
+  pipArea.textContent=L(s.area);
+  pipTitle.textContent=L(s.title);
+  pipDesc.textContent=L(s.desc);
+  pipPoints.innerHTML=s.points.map(p=>`<div><b>${L(p[0])}</b><span>${L(p[1])}</span></div>`).join('');
+  pipImg.style.display='none'; pipVid.style.display='';
+  pipVid.poster=s.poster;
+  if(pipVid.getAttribute('src')!==s.video) pipVid.src=s.video;
+  pipVid.play().catch(()=>{});
+  // panel opens on the side away from the anchor; link tethers the two
+  const fm=fieldMap.getBoundingClientRect();
+  pip.classList.toggle('left', fromEl.getBoundingClientRect().left > fm.width*0.5);
+  fieldMap.classList.add('open'); pip.classList.add('on');
+  requestAnimationFrame(()=>drawLink(fromEl,pip));
+}
+pipVid.addEventListener('error',()=>{           // hotlink fallback -> poster photo
+  if(pipOpenK<0)return;
+  pipVid.style.display='none'; pipImg.style.display='';
+  pipImg.src=SCENES[pipOpenK].poster;
+});
+function closePip(){
+  pip.classList.remove('on'); pipVid.pause(); pipOpenK=-1;
+  anchorEls.forEach(el=>el.classList.remove('sel'));
+  if(!solGrid.classList.contains('on')){fieldMap.classList.remove('open');mlink.innerHTML='';}
+}
+function openGrid(fromEl){
+  killHint(); closePip();
+  solGrid.classList.add('on'); fieldMap.classList.add('open');
+  requestAnimationFrame(()=>drawLink(fromEl,solGrid.querySelector('.sg-grid')));
+}
+function closeGrid(){
+  solGrid.classList.remove('on');
+  if(!pip.classList.contains('on')){fieldMap.classList.remove('open');mlink.innerHTML='';}
+}
+function closeAllMap(){closePip();closeGrid();}
+document.getElementById('pipX').addEventListener('click',closePip);
+document.getElementById('sgX').addEventListener('click',closeGrid);
+document.getElementById('mpScrim').addEventListener('click',closeAllMap);
+addEventListener('keydown',e=>{if(e.key==='Escape')closeAllMap();});
+let mapLive=false, diveFroze=false;
+const mpSvg=document.getElementById('mpSvg'), mpBot=document.querySelector('.mp-bot');
+const garageWrap=document.getElementById('garageWrap'), garageSec=document.querySelector('.sec-garage');
+const bentoWrap=document.getElementById('bentoWrap'), bentoSec=document.querySelector('.sec-bento');
+let aiHook=null;   // assigned by the part-5 block at the end of the script
+const secTitle=document.getElementById('secTitle');
+const tunIntro=document.getElementById('tunIntro');
+const tiBeats=[...tunIntro.querySelectorAll('.ti-beat')];
+// split each title's glyphs into .ti-ch spans (for staggered entrance);
+// re-runnable so the language toggle can re-split with the other text
+function splitBeatTitles(){
+  tiBeats.forEach(b=>{
+    b.querySelectorAll('.ti-h[data-split] span[data-en]').forEach(seg=>{
+      if(!seg.dataset.zh) seg.dataset.zh=seg.textContent;
+      const txt=LANG==='en'?seg.dataset.en:seg.dataset.zh;
+      const isAccent=seg.classList.contains('ti-accent');
+      const step=Math.min(0.038, 0.6/Math.max(1,txt.length));  // long EN lines stay snappy
+      seg.textContent='';
+      [...txt].forEach((ch,k)=>{
+        const s=document.createElement('span');
+        s.className='ti-ch'; s.textContent=ch;
+        if(ch===' ') s.style.width='.28em';
+        s.style.animationDelay=(step*k + (isAccent?0.08:0))+'s';
+        seg.appendChild(s);
+      });
+    });
+  });
+}
+splitBeatTitles();
+let curBeat=-1;  // track active beat to restart animations on change
+let introLive=false;  // whether the intro overlay is currently visible (for beat-0 replay)
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function smooth(e0,e1,x){x=clamp((x-e0)/(e1-e0),0,1);return x*x*(3-2*x);}
+
+let p=0;
+// The cinematic is driven ONLY by the spacer's own scroll extent, so appended
+// normal-flow content below (#site) doesn't dilute the 3D timeline.
+const spacer=document.getElementById('spacer');
+// debug: "?cap" exposes a headless still-frame capture. Needed because the preview
+// harness runs with a 0x0 viewport (rAF paused, vh-heights collapse), so normal
+// scroll-driven rendering can't be inspected. __render(p,w,h) forces a size, pins
+// the scroll progress, drives one tick(), and returns a downscaled JPEG data URL.
+if(location.search.indexOf('cap')>=0){
+  window.__render=(pp,w,h)=>{
+    w=w||1280;h=h||720;
+    p=Math.max(0,Math.min(1,pp));             // pin scroll progress directly
+    renderer.setSize(w,h);
+    camera.aspect=w/h; camera.updateProjectionMatrix();
+    tick();                                   // updates all state from p, renders one frame
+    const o=document.createElement('canvas');
+    o.width=Math.round(w*0.4); o.height=Math.round(h*0.4);
+    o.getContext('2d').drawImage(renderer.domElement,0,0,o.width,o.height);
+    return o.toDataURL('image/jpeg',0.6);
+  };
+  // isolate the mote field's contribution: render normally, then again with the
+  // particles forced off (uFade=0) and diff the teal/luma. dTeal>0 through the beats
+  // proves the glowing field now survives all the way to 强AI (it used to be gone).
+  window.__measure=(pp)=>{
+    const meas=()=>{const c=document.getElementById('c');const o=document.createElement('canvas');o.width=256;o.height=144;const x=o.getContext('2d');x.drawImage(c,0,0,256,144);const d=x.getImageData(0,0,256,144).data;let s=0,tl=0,mx=0;const n=d.length/4;for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2];const l=(r+g+b)/3;s+=l;if(l>mx)mx=l;if((g+b)/2>r+16&&l>34)tl++;}return {L:+(s/n).toFixed(2),teal:+(100*tl/n).toFixed(1),max:mx};};
+    p=Math.max(0,Math.min(1,pp));renderer.setSize(1280,720);camera.aspect=1280/720;camera.updateProjectionMatrix();
+    tick();const on=meas();
+    const real={col:pU.uColor.value.getHexString(),warp:+pU.uWarp.value.toFixed(2),fade:+pU.uFade.value.toFixed(2),rel:+pU.uRel.value.toFixed(2)};
+    pU.uFade.value=0;renderer.render(scene,camera);const off=meas();
+    // motes-only pass: kill wall/rings/waypoints/bg-glow, force uFade=1
+    pU.uFade.value=1;wallMat.opacity=0;bgU.glow.value=0;
+    ringGroup.children.forEach(r=>r.material.opacity=0);wpGroup.children.forEach(r=>r.material.opacity=0);
+    renderer.render(scene,camera);const only=meas();
+    return {p:pp,camZ:+camera.position.z.toFixed(0),dL:+(on.L-off.L).toFixed(2),motesOnlyL:only.L,
+      col:real.col,warp:real.warp,fade:real.fade,rel:real.rel};
+  };
+}
+function onScroll(){
+  const range=spacer.offsetTop+spacer.offsetHeight-innerHeight;
+  p=range>0?clamp(scrollY/range,0,1):0;
+  hint.style.opacity=p>0.02?0:1;
+}
+addEventListener('scroll',onScroll,{passive:true});
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+
+/* phase mapping along p:
+   0.00–0.18  HERO: dog visible, motes drift, glow warm-blue
+   0.18–0.45  ROUTE: motes flow forward, waypoints light up, copy2
+   0.45–0.78  TUNNEL FORM: rings contract in, wall fades, teal grade, copy3
+   0.78–1.00  TUNNEL DEEP: camera deep inside, wall textured, push to vanishing
+*/
+const COLDTEAL=new THREE.Color(0x2a6d72), WARMBLUE=new THREE.Color(0x1a4e88), DEEPBLUE=new THREE.Color(0x2a4fb2);
+/* mote color journey (user note: beats bg must NOT sit on the cyan accent of the
+   type, and must feel continuous with the hero): hero ice-blue -> electric blue ->
+   subtle indigo through the beats, white-hot flash on release. The teal grade now
+   belongs to the SCENE section only. */
+const MOTE_BLUE=new THREE.Color(0x6fd8ff), MOTE_ELEC=new THREE.Color(0x5b8dff),
+      MOTE_INDIGO=new THREE.Color(0x8f8dff), MOTE_FLASH=new THREE.Color(0xe8f4ff);
+const FOG_HERO=new THREE.Color(0x06121f), FOG_BLUE=new THREE.Color(0x081428), FOG_TEAL=new THREE.Color(0x06201f);
+const RING_BLUE=new THREE.Color(0x8fa8ff), RING_TEAL=new THREE.Color(0x7fe0d8);
+const tmp=new THREE.Color(), tmpRing=new THREE.Color();
+
+const clock=new THREE.Clock();
+function tick(){
+  const t=clock.getElapsedTime();
+  pU.t.value=t; bgU.t.value=t;
+
+  // --- timeline remap ---
+  // Hero + dog-dive-into-tunnel happen QUICKLY at the very start; the moment the
+  // tunnel forms, content begins (title, then scenes) — all in ONE continuous
+  // tunnel pass. No empty tunnel stretch.
+  const HERO_END=0.11;                       // brief: hero -> dog dives into tunnel (shortened)
+  const pf = clamp(p/HERO_END,0,1);          // 0..1 drives hero + tunnel entry
+  const ps = clamp((p-HERO_END)/(1-HERO_END),0,1); // 0..1 drives content-in-tunnel
+
+  const route=smooth(0.20,0.60,pf);
+  const tunForm=smooth(0.55,1.0,pf);         // tunnel fully formed by end of hero
+  const tunDeep=smooth(0.80,1.0,pf);
+  const heroOut=smooth(0.30,0.85,pf);
+
+  // ---- shared beat/transition timeline (ps) ----
+  // Three equal-FEEL beats: beat 0 gets a shorter ps window because it already
+  // dwells through the hero tail (intro fades in from pf .5) — tuned so all three
+  // read ~85vh of scroll each at the 990vh spacer.
+  const BB1=0.06, BB2=0.167, BEATS_END=0.274;
+  // release choreography (强AI之后): warp surge -> field blows outward & de-rezzes,
+  // title flies in THROUGH the streaking field, all settled before the scenes.
+  const relBell = smooth(0.278,0.345,ps)*(1-smooth(0.405,0.47,ps)); // speed/brightness surge
+  const relExp  = smooth(0.305,0.50,ps);                         // radius blow-out
+  const relFade = smooth(0.365,0.50,ps);                         // de-rez dissolve
+  const sceneShift = smooth(0.305,0.52,ps);                      // color grade: blue -> teal
+  const mapIn = smooth(0.50,0.60,ps);                            // tunnel-exit pull-up onto the plan
+
+  // camera flies forward along -Z continuously; speeds up entering tunnel,
+  // KEEPS its rush through the three beats, then eases down for the scenes.
+  const EASE_END  = 0.46;                       // velocity fully settled before scenes
+  const V_FAST = 470, V_SLOW = 150;             // rush vs calm travel coefficients
+  // distance travelled, built to be continuous (C0) with a smooth velocity taper.
+  let rushDist;
+  if(ps<=BEATS_END){
+    rushDist = ps*V_FAST;                        // constant strong rush through the beats
+  }else if(ps<EASE_END){
+    // decelerate smoothly from V_FAST to V_SLOW across [BEATS_END, EASE_END];
+    // integrate v(ps)=lerp(V_FAST,V_SLOW,smoothstep) so distance stays continuous.
+    const span=EASE_END-BEATS_END, u=(ps-BEATS_END)/span;
+    const ue=u*u*(3-2*u);                        // smoothstep blend for velocity
+    const vAvg=V_FAST*(1-ue*0.5) + V_SLOW*(ue*0.5); // approx running average over [0,u]
+    rushDist = BEATS_END*V_FAST + (ps-BEATS_END)*vAvg;
+  }else{
+    const span=EASE_END-BEATS_END;
+    const distAtEase = BEATS_END*V_FAST + span*((V_FAST+V_SLOW)/2); // avg velocity over the taper
+    rushDist = distAtEase + (ps-EASE_END)*V_SLOW; // calm creep for scenes
+  }
+  const camZ = -(route*40 + tunForm*70 + tunDeep*120 + rushDist);
+  camera.position.z = camZ + 14;
+  camera.position.x = Math.sin(pf*3.0)*1.2*(1-tunDeep) + mx*1.2;
+  camera.position.y = Math.sin(pf*4.0)*0.5*(1-tunDeep) + (-my*0.8);
+  camera.lookAt(0,0,camZ-20);
+  pU.uCamZ.value = -camZ;
+
+  // backdrop glow + color: warm blue -> DEEP electric blue through the beats (kept
+  // clearly apart from the cyan accent type for clarity), then to the cold teal
+  // grade only as the release hands off to the scene section. Brief glow lift +
+  // fog thin-out at the burst so the tunnel reads as "opening up".
+  tmp.copy(WARMBLUE).lerp(DEEPBLUE,tunForm).lerp(COLDTEAL,sceneShift);
+  bgU.cGlow.value.copy(tmp);
+  bgU.glow.value = 0.45*(1-tunForm)+0.25*tunForm + relBell*0.15 + mapIn*0.08;
+  scene.fog.color.copy(FOG_HERO).lerp(FOG_BLUE,tunForm).lerp(FOG_TEAL,sceneShift);
+  scene.fog.density = 0.016 + tunForm*0.01 + tunDeep*0.02 - relBell*0.012 - mapIn*0.006;
+
+  // motes: color journey (see consts) + tunnel pull + release drivers
+  tmp.copy(MOTE_BLUE).lerp(MOTE_ELEC,smooth(0.02,0.12,ps))
+     .lerp(MOTE_INDIGO,smooth(0.14,0.24,ps)).lerp(MOTE_FLASH,relBell*0.65);
+  pU.uColor.value.copy(tmp);
+  pU.uTunnel.value = tunForm;
+  pU.uWarp.value = relBell;
+  pU.uFade.value = 1-relFade;
+  pU.uRel.value  = relExp;
+
+  // waypoints light during route phase, fade as tunnel forms
+  const wpOp = route*(1-tunForm*0.9);
+  wpGroup.children.forEach((r,i)=>{
+    r.material.opacity = wpOp*clamp(1.0 - Math.abs((i/WPN)- (route*0.8)) ,0,1)*1.4;
+    r.lookAt(camera.position);
+  });
+
+  // tunnel rings: gently rush past (subtle, so they read as calm background)
+  const tunnelOn = Math.max(tunForm, ps>0?1:0);
+  const RING_SP = 7;
+  const RING_TOTAL = RINGN*RING_SP;
+  tmpRing.copy(RING_BLUE).lerp(RING_TEAL,sceneShift);   // rings follow the same grade
+  ringGroup.children.forEach((r,i)=>{
+    let worldZ = camZ - 6 - ((i*RING_SP + ((-camZ)%RING_SP)) % RING_TOTAL);
+    r.position.z = worldZ;
+    const distAhead = camZ - worldZ;
+    const fadeIn = clamp(distAhead/30,0,1);
+    const fadeOut = clamp((RING_TOTAL-distAhead)/40,0,1);
+    r.material.color.copy(tmpRing);
+    r.material.opacity = tunnelOn*fadeIn*fadeOut*0.5*(1.0+relBell*0.9)*(1-mapIn);  // gone once we're out on the plan
+    // rings dilate hard during the release so the tunnel reads as "opening up"
+    // into the scene section, then settle back to the calm radius for the fly-through.
+    const rs=THREE.MathUtils.lerp(3.0,2.4,tunForm)*(1.0+relBell*1.15)*(1.0+0.04*Math.sin(t*0.8+i*0.5));
+    r.scale.set(rs/3.0,rs/3.0,1);
+  });
+
+  // tunnel wall: present but quiet, scrolls gently to keep a sense of travel.
+  // Dip it back while the beats play so the restored particle field is the star
+  // (was a flat 0.55, which read as a monotonous "rotating photo"); return to full
+  // for the scene fly-through. Continuous at the hero->content seam (dip=0 there).
+  const wallDip = smooth(0.0,0.10,ps)*(1-smooth(0.30,0.46,ps));
+  wallMat.opacity = (ps>0 ? (0.55 - 0.18*wallDip) : clamp(tunForm*0.4 + tunDeep*0.25, 0, 0.55))*(1-mapIn);
+  wall.position.z = camZ - 60;
+  tex.offset.x = t*0.015;
+  tex.offset.y = (-camZ)*0.0025;
+
+  // robot dog: front-and-center in hero, then recedes/dims as we move past it
+  // ROBOT DOG: holds center in hero, then gets pulled INTO the tunnel —
+  // recedes toward the vanishing point (shrinks + lifts slightly toward center),
+  // darkening and shrinking as the tunnel mouth swallows it.
+  const pull = smooth(0.06, 0.42, pf);          // 0..1 how far it's been drawn in (faster)
+  const dogScale = 1 - pull*0.92;                // shrinks toward a point
+  // rest position is right-of-center (CSS left:76%); as it's pulled in,
+  // drift back toward true screen center (the corridor vanishing point)
+  const restOffsetVW = (82-50);                  // % from center at rest
+  const dogX = -restOffsetVW*0.01*innerWidth*pull; // move left toward center
+  const dogY = -pull*innerHeight*0.04;
+  const dogFade = 1 - smooth(0.24, 0.46, pf);
+  dog.style.transform = `translate(calc(-50% + ${dogX.toFixed(0)}px), calc(-50% + ${dogY.toFixed(0)}px)) scale(${dogScale.toFixed(3)})`;
+  dog.style.opacity = dogFade.toFixed(2);
+  dog.style.filter = `drop-shadow(0 30px 60px rgba(0,0,0,.7)) saturate(${(1-tunForm*0.4).toFixed(2)}) brightness(${(1-pull*0.45).toFixed(2)})`;
+
+  // copy phases — hero copy only during hero, gone once we move on
+  const inScenes = ps>0.001;
+  c1.classList.toggle('on', pf<0.16 && !inScenes);
+  // fade the hero capability carousel out as we leave the hero
+  const c1wrap=document.querySelector('.copy.hero1');
+
+  /* ===== tunnel-entry INTRO — four-beat capability progression =====
+     Bridges the dark stretch after the dog is swallowed. The overlay fades in
+     during the hero tail, then four beats (人工巡检→机器人路线 ... 强AI巡检) cross-fade
+     across the first part of the content phase, with a step rail tracking
+     progress, before handing off to the section title. */
+  const I_IN=0.50, I_INE=0.74;          // appear window in pf (as dog vanishes)
+  const I_OUT0=BEATS_END+0.012;          // intro begins leaving after last beat
+  const I_OUT1=I_OUT0+0.035;
+  let introOp, introZ;
+  if(ps<=0){
+    const a=smooth(I_IN,I_INE,pf);
+    introOp=a; introZ=-240 + a*240;            // glide from far toward camera
+  }else{
+    const leave=smooth(I_OUT0,I_OUT1,ps);
+    introOp=1-leave;
+    introZ=clamp(ps/I_OUT1,0,1)*240;           // gentle continued forward drift
+  }
+  tunIntro.style.opacity=clamp(introOp,0,1).toFixed(3);
+  tunIntro.style.transform=`translateZ(${introZ.toFixed(0)}px)`;
+  // active beat from the custom windows (0 / BB1 / BB2 / BEATS_END); hero tail = beat 0
+  let active = ps<=0 ? 0 : (ps<BB1 ? 0 : (ps<BB2 ? 1 : 2));
+  if(active!==curBeat){
+    curBeat=active;
+    tiBeats.forEach((b,i)=>b.classList.toggle('on', i===active));
+  }
+  // Beat 0's diagram used to play AT PAGE LOAD (its .on lands on the first tick,
+  // long before the intro is visible), so users arrived to a finished, static
+  // diagram. Re-trigger its animations the moment the intro actually becomes
+  // visible (and again if the user scrolls back up through it).
+  const introLiveNow = introOp>0.12;
+  if(introLiveNow && !introLive && active===0){
+    const b=tiBeats[0]; b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');
+  }
+  introLive=introLiveNow;
+
+  /* ===== SECTION-3 orchestration (ps): big title 0.335-0.465, then the
+     interactive FIELD MAP holds 0.50-1.0 (anchors open PiP / matrix on click) ===== */
+  // big title — flies in along Z THROUGH the releasing particle storm (the burst
+  // peaks ~0.34-0.40), riding the camera's residual momentum: carry-over from the
+  // beats, lead-in to the scenes.
+  const titleIn = smooth(0.335,0.375,ps)*(1-smooth(0.43,0.465,ps));
+  const titleLocal = clamp((ps-0.335)/0.13,0,1);
+  const titleZ = -400 + titleLocal*600;
+  secTitle.style.opacity = titleIn.toFixed(3);
+  secTitle.style.transform = `translateZ(${titleZ.toFixed(0)}px)`;
+
+  // ===== FIELD MAP: tunnel-exit pull-up =====
+  // As the particle release settles you scroll OUT of the tunnel and climb to an
+  // aerial view: the plan starts zoomed-in (scale ~2.6, ground level) and eases
+  // back to 1.0 (full survey view); rings/wall have faded with mapIn, so the
+  // tunnel is literally left behind. Anchors then stagger in as destinations.
+  // exit dive (part-3 -> part-4): the roaming patrol dot FREEZES, and the camera
+  // plunges into it — the same dot "becomes" the robot presented on the next page.
+  // Pulled earlier (0.76) so map-hold + dive take far less scrolling.
+  const dive = smooth(0.76,0.92,ps);
+  const mapOn = mapIn*(1-smooth(0.86,0.945,ps));
+  fieldMap.style.opacity=mapOn.toFixed(3);
+  fieldMap.classList.toggle('diving', dive>0.02);
+  if(dive>0.01 && !diveFroze){
+    diveFroze=true;
+    try{mpSvg.pauseAnimations();}catch(e){}
+    // both rects carry the same parallax translate, so the diff IS the local
+    // (untransformed) position — safe as a transform-origin (scale is 1 here)
+    const st=mpStage.getBoundingClientRect(), b=mpBot.getBoundingClientRect();
+    mpStage.style.transformOrigin=`${(b.left+b.width/2-st.left).toFixed(1)}px ${(b.top+b.height/2-st.top).toFixed(1)}px`;
+  }else if(dive<=0.01 && diveFroze){
+    diveFroze=false;
+    try{mpSvg.unpauseAnimations();}catch(e){}
+    mpStage.style.transformOrigin='50% 46%';
+  }
+  let zoom,txp,typ;
+  if(dive>0){ zoom=1+dive*dive*9; txp=0; typ=0; }     // accelerating plunge
+  else{ zoom=1+(1-mapIn)*1.6; txp=-mx*12; typ=-my*8; } // entry pull-up + parallax
+  mpStage.style.transform=`translate(${txp.toFixed(1)}px,${typ.toFixed(1)}px) scale(${zoom.toFixed(3)})`;
+  fieldMap.classList.toggle('arrived', mapIn>0.92 && mapOn>0.5 && dive<0.05);
+  const live=mapOn>0.5 && dive<0.2;
+
+  // ===== GARAGE page entrance: pinned by #garageWrap, fades in WHOLE (like the
+  // map page appearing), with a slight settle-scale continuing the dive motion.
+  if(garageWrap && innerWidth>900){
+    const gr=garageWrap.getBoundingClientRect();
+    const span=gr.height-innerHeight;
+    if(span>10){
+      const gl=clamp(-gr.top/span,0,1);
+      const ga=smooth(0.0,0.15,gl);         // long, soft materialize (~54vh of scroll)
+      garageSec.style.opacity=ga.toFixed(3);
+      garageSec.style.transform=`scale(${(1.05-0.05*ga).toFixed(4)})`;
+      if(aiHook) aiHook(gl,t);              // part-5 mode + orbit engine
+    }
+  }else if(garageSec.style.opacity!==''){
+    garageSec.style.opacity=''; garageSec.style.transform='';
+  }
+
+  // ===== BENTO page (part 6): same whole-page materialize, tiles stagger in
+  if(bentoWrap && innerWidth>900){
+    const br=bentoWrap.getBoundingClientRect(), bspan=br.height-innerHeight;
+    if(bspan>10){
+      const bl=clamp(-br.top/bspan,0,1);
+      const ba=smooth(0,0.22,bl);
+      bentoSec.style.opacity=ba.toFixed(3);
+      bentoSec.style.transform=`scale(${(1.04-0.04*ba).toFixed(4)})`;
+      bentoSec.classList.toggle('shown',  bl>0.16);   // phase 1: platform mosaic
+      bentoSec.classList.toggle('shown2', bl>0.52);   // phase 2: workflow strip
+    }
+  }else if(bentoSec){
+    if(bentoSec.style.opacity!==''){bentoSec.style.opacity='';bentoSec.style.transform='';}
+    bentoSec.classList.add('shown'); bentoSec.classList.add('shown2');
+  }
+  if(live!==mapLive){
+    mapLive=live;
+    fieldMap.classList.toggle('live',live);
+    if(live) placeAnchors();     // layout is final by now (fonts/resize)
+    else closeAllMap();          // leaving the section closes panels & stops video
+  }
+
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+onScroll(); tick();
+
+/* ===== post-cinematic sections: reveal-on-scroll ===== */
+const revealEls=document.querySelectorAll('[data-reveal]');
+if('IntersectionObserver' in window){
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});
+  },{rootMargin:'0px 0px -12% 0px',threshold:0.12});
+  revealEls.forEach(el=>io.observe(el));
+}else{
+  revealEls.forEach(el=>el.classList.add('in'));
+}
+
+/* ===== GARAGE: robot + payload configurator ===== */
+const T={speed:{zh:'最大速度',en:'Max Speed'},load:{zh:'负载',en:'Payload'},slope:{zh:'爬坡',en:'Slope'},
+  obst:{zh:'越障',en:'Obstacle'},wt:{zh:'整备重量',en:'Weight'},ip:{zh:'防护等级',en:'Protection'},
+  bat:{zh:'续航',en:'Battery'},temp:{zh:'工作温域',en:'Temperature'},form:{zh:'形态',en:'Form'},
+  size:{zh:'尺寸',en:'Size'},sense:{zh:'感知',en:'Perception'}};
+const DOGS=[
+ {id:'M20',form:{zh:'轮腿式 · 中型',en:'Wheeled-Leg · Medium'},img:'assets/m20.jpg',
+  role:{zh:'可上下楼梯、跨越门槛,兼顾机动与负载的多场景主力平台。',en:'Stair and threshold access — the multi-scenario workhorse balancing mobility and payload.'},
+  spec:[[T.speed,'3','m/s'],[T.load,'15','kg'],[T.slope,'±45','°'],[T.obst,'≤25','cm'],[T.wt,'35','kg'],[T.ip,'IP66','']],
+  foot:[T.size,'820 × 430 × 570 mm']},
+ {id:'S10',form:{zh:'轮腿式 · 轻量',en:'Wheeled-Leg · Lightweight'},img:'assets/s10.jpg',
+  role:{zh:'可双足站立,穿行狭窄空间与室内灵活路线的轻量平台。',en:'Biped standing; a lightweight platform for narrow spaces and flexible indoor routes.'},
+  spec:[[T.speed,'5','m/s'],[T.wt,'≤20','kg'],[T.bat,'3+','h'],[T.temp,'-20~55','°C'],[T.ip,'IP66',''],[T.form,{zh:'双足站立',en:'Biped standing'},'']],
+  foot:[T.sense,{zh:'广角相机 + 激光雷达',en:'Wide-angle + LiDAR'}]},
+ {id:'X30',form:{zh:'四足 · 全地形',en:'Quadruped · All-Terrain'},img:'assets/x30.jpg',
+  role:{zh:'面向复杂工业环境,稳定爬楼与越障的全地形四足平台。',en:'All-terrain quadruped for complex industrial environments, stable on stairs and obstacles.'},
+  spec:[[T.speed,'4.95','m/s'],[T.load,'20','kg'],[T.slope,'±30','°'],[T.obst,'≤20','cm'],[T.wt,'59','kg'],[T.ip,'IP67','']],
+  foot:[T.size,'1000 × 470 × 715 mm']},
+];
+// the official gimbal photo 404s on the source site — line-art stand-in, same idiom
+const GIMBAL_SVG='<svg viewBox="0 0 120 90" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#37e0f2" stroke-width="1.5" stroke-linecap="round"><path d="M60 8 v10" opacity=".7"/><rect x="52" y="18" width="16" height="8" rx="2"/><path d="M60 26 v8"/><circle cx="60" cy="52" r="18"/><circle cx="60" cy="52" r="10" opacity=".7"/><circle cx="60" cy="52" r="3" fill="#37e0f2" stroke="none"/><path d="M30 52 a30 30 0 0 1 60 0" opacity=".45"/><path d="M26 52 h-8 M102 52 h-8" opacity=".6"/><rect x="40" y="72" width="40" height="8" rx="2" opacity=".7"/></svg>';
+const MODS=[
+ {id:'01',name:{zh:'双光谱云台相机',en:'Bi-Spectrum Camera'},img:'assets/mod-bispec.png',
+  lines:[{zh:'可见光 2688×1520',en:'Visible light 2688×1520'},{zh:'25 倍光学 / 16 倍数字变焦',en:'25x optical / 16x digital zoom'},{zh:'红外 256×192(可选)· ±2°C',en:'Infrared 256×192 optional, ±2°C'},{zh:'水平 360° / 垂直 90° · IP66',en:'360° horizontal / 90° vertical, IP66'}]},
+ {id:'02',name:{zh:'气体传感模块',en:'Gas Sensors'},img:'assets/mod-gas.png',
+  lines:[{zh:'温度与湿度',en:'Temperature and humidity'},{zh:'PM2.5 / PM1.0 / PM0.5',en:'PM2.5 / PM1.0 / PM0.5'},{zh:'CO₂ · TVOC · 甲醛',en:'CO2, TVOC, formaldehyde'},{zh:'烟雾及可定制气体',en:'Smoke and custom gas options'}]},
+ {id:'03',name:{zh:'全景相机',en:'Panoramic Camera'},img:'assets/mod-pano.png',
+  lines:[{zh:'720° / 8K 全景采集',en:'720° / 8K panoramic capture'},{zh:'内置 4×8MP 图像传感器',en:'Built-in 4×8MP image sensors'},{zh:'最高 32MP',en:'Up to 32MP'},{zh:'IP67 · 防雷 · 防浪涌 · 防静电',en:'IP67, lightning, surge, anti-static'}]},
+ {id:'04',name:{zh:'5G 通讯模块',en:'5G Communication'},img:'assets/mod-5g.png',
+  lines:[{zh:'SA / NSA · Cat20 · 峰值 2Gbps',en:'SA/NSA, Cat20, up to 2Gbps'},{zh:'8×8 MIMO · Wi-Fi 6 · TDMA',en:'8×8 MIMO, Wi-Fi 6, TDMA'},{zh:'-40~70°C 宽温',en:'-40~70°C wide temperature'},{zh:'12–24V 供电',en:'12–24V input'}]},
+ {id:'05',name:{zh:'声光告警器',en:'Audio-Visual Alarm'},img:'assets/mod-alarm.png',
+  lines:[{zh:'三色告警:黄 / 绿 / 红',en:'3-color alarm: yellow / green / red'},{zh:'多种闪烁模式',en:'Multiple flashing modes'},{zh:'自定义语音播报',en:'Custom voice playback'},{zh:'IP65 雨中可用 · 螺丝或磁吸安装',en:'IP65 rain use, screw or magnetic install'}]},
+ {id:'06',name:{zh:'360° 激光雷达',en:'360° LiDAR'},img:'assets/mod-lidar.png',
+  lines:[{zh:'360°×59° 视场角',en:'360°×59° field of view'},{zh:'20 万点 / 秒',en:'200,000 points per second'},{zh:'0.1–200m 测距 · ±2cm 精度',en:'0.1–200m ranging, ±2cm accuracy'},{zh:'动态避障与 3D SLAM',en:'Dynamic obstacle avoidance and 3D SLAM'}]},
+ {id:'07',name:{zh:'机器人控制器',en:'Robot Controller'},img:'assets/mod-ctrl.jpg',
+  lines:[{zh:'18–36VDC · 以太网 / CAN / RS485',en:'18–36VDC, Ethernet / CAN / RS485'},{zh:'3D SLAM + RTK 定位',en:'3D SLAM + RTK positioning'},{zh:'自动建图 · 路线规划 · 避障',en:'Auto mapping, route planning, obstacle avoidance'},{zh:'自动回充 · MQTT / HTTP 接入',en:'Auto charging, MQTT / HTTP integration'}]},
+ {id:'08',name:{zh:'双光云台(轻型)',en:'Dual-Light Gimbal'},svg:GIMBAL_SVG,
+  lines:[{zh:'三轴可见光 + 热成像云台',en:'3-axis visible + thermal gimbal'},{zh:'4MP 可见光 + 640×512 热成像',en:'4MP visible + 640×512 thermal'},{zh:'30 倍变焦 · 探测 1200m',en:'30x zoom, 1200m range'},{zh:'AI 跟踪 · ≤640g 轻量',en:'AI tracking, ≤640g lightweight payload'}]},
+];
+const gSpec=document.getElementById('gSpec'),gsKind=document.getElementById('gsKind'),
+      gsName=document.getElementById('gsName'),gsForm=document.getElementById('gsForm'),
+      gsRole=document.getElementById('gsRole'),gsBody=document.getElementById('gsBody'),
+      gsFoot=document.getElementById('gsFoot'),
+      gDogImg=document.getElementById('gDogImg'),gDogWrap=document.getElementById('gDogWrap'),
+      gModCard=document.getElementById('gModCard'),gModBox=document.getElementById('gModBox'),
+      gModName=document.getElementById('gModName'),gLink=document.getElementById('gLink'),
+      tabDogs=document.getElementById('tabDogs'),tabMods=document.getElementById('tabMods'),
+      dogPanel=document.getElementById('dogPanel'),modPanel=document.getElementById('modPanel'),
+      dogCar=document.getElementById('dogCar'),modList=document.getElementById('modList');
+let dogI=2, modI=-1;   // start on X30 (matches the hero robot), no module fitted
+const dogEls=DOGS.map((d,i)=>{
+  const b=document.createElement('button');
+  b.className='g-dogitem'; b.type='button';
+  b.innerHTML=`<span class="dth"><img src="${d.img}" alt="${d.id}"></span><b>${d.id}</b><em data-en="${d.form.en}">${d.form.zh}</em>`;
+  b.addEventListener('click',()=>selectDog(i));
+  dogCar.appendChild(b); return b;
+});
+const modEls=MODS.map((m,i)=>{
+  const b=document.createElement('button');
+  b.className='g-mod'; b.type='button';
+  b.innerHTML=`<span class="th">${m.img?`<img src="${m.img}" alt="">`:m.svg}</span><span><i>${m.id}</i><span data-en="${m.name.en}">${m.name.zh}</span></span>`;
+  b.addEventListener('click',()=>toggleMod(i));
+  modList.appendChild(b); return b;
+});
+// carousel: picked dog revolves to the center slot (circular offsets -1/0/1)
+function layoutDogs(){
+  dogEls.forEach((el,i)=>{
+    const off=((i-dogI+1+3)%3)-1;
+    el.style.transform=`translateX(calc(-50% + ${off*138}px)) scale(${off?0.86:1.06})`;
+    el.style.opacity=off?0.55:1;
+    el.style.zIndex=off?1:2;
+    el.classList.toggle('sel',i===dogI);
+  });
+}
+function renderSpec(){
+  gSpec.classList.add('swap');
+  setTimeout(()=>{
+    if(modI<0){
+      const d=DOGS[dogI];
+      gsKind.textContent=LANG==='en'?'Robot · Body':'机器人 · 本体'; gsName.textContent=d.id;
+      gsForm.textContent=L(d.form); gsRole.textContent=L(d.role);
+      gsBody.innerHTML='<dl class="spec">'+d.spec.map(s=>`<div><dt>${L(s[0])}</dt><dd>${L(s[1])}${s[2]?`<i>${s[2]}</i>`:''}</dd></div>`).join('')+'</dl>';
+      gsFoot.innerHTML=`<span>${L(d.foot[0])}</span><b>${L(d.foot[1])}</b>`;
+    }else{
+      const m=MODS[modI];
+      gsKind.textContent=LANG==='en'?'Payload · Module':'上装 · 模块'; gsName.textContent=L(m.name);
+      gsForm.textContent=(LANG==='en'?'Module ':'模块 ')+m.id+' / 08';
+      gsRole.textContent=LANG==='en'?'Fits M20 / S10 / X30; combines freely with other payloads.':'适配 M20 / S10 / X30,可与其他上装组合装配。';
+      gsBody.innerHTML='<ul class="gs-lines">'+m.lines.map(l=>`<li>${L(l)}</li>`).join('')+'</ul>';
+      gsFoot.innerHTML=LANG==='en'
+        ?`<span>Mount</span><b>${DOGS[dogI].id} quick-mount</b>`
+        :`<span>装配</span><b>${DOGS[dogI].id} 快装接口</b>`;
+    }
+    gSpec.classList.remove('swap');
+  },190);
+}
+// PCB tether from the dog plate to the module card
+function drawGLink(){
+  if(modI<0){gLink.innerHTML='';return;}
+  const st=gLink.getBoundingClientRect();
+  const a=gDogWrap.querySelector('.g-plate').getBoundingClientRect();
+  const b=gModCard.getBoundingClientRect();
+  const ax=a.right-st.left-6, ay=a.top+a.height*0.42-st.top;
+  const px=b.left-st.left, py=b.top+b.height*0.5-st.top;
+  const mx=(ax+px)/2;
+  gLink.setAttribute('viewBox',`0 0 ${st.width} ${st.height}`);
+  const d=`M ${ax} ${ay} L ${mx} ${ay} L ${mx} ${py} L ${px} ${py}`;
+  gLink.innerHTML=`<path class="ct-base" d="${d}"/><path class="ct-flow" d="${d}"/>`+
+    `<circle class="ct-node" cx="${ax}" cy="${ay}" r="2.6"/><circle class="ct-node" cx="${px}" cy="${py}" r="2.6"/>`;
+}
+function renderStage(){
+  if(modI<0){
+    gDogWrap.classList.remove('back'); gModCard.classList.remove('on'); gLink.innerHTML='';
+  }else{
+    const m=MODS[modI];
+    gModBox.innerHTML=m.img?`<img src="${m.img}" alt="">`:m.svg;
+    gModName.innerHTML=`<i>${m.id}</i>${L(m.name)}`;
+    gDogWrap.classList.add('back'); gModCard.classList.add('on');
+    requestAnimationFrame(()=>requestAnimationFrame(drawGLink));
+    setTimeout(drawGLink,520);   // settle after transitions
+  }
+  modEls.forEach((el,i)=>el.classList.toggle('sel',i===modI));
+}
+function selectDog(i){
+  if(dogI!==i){
+    dogI=i;
+    gDogImg.classList.add('swap');
+    setTimeout(()=>{gDogImg.src=DOGS[dogI].img;gDogImg.classList.remove('swap');},230);
+  }
+  if(modI>=0){modI=-1;renderStage();}   // picking a body returns the stage to the dog
+  layoutDogs(); renderSpec();
+}
+function toggleMod(i){ modI=(modI===i?-1:i); renderStage(); renderSpec(); }  // re-click = 回退
+function openPanel(which){
+  const dOpen=which==='dogs', mOpen=which==='mods';   // mutually exclusive
+  tabDogs.classList.toggle('on',dOpen); dogPanel.classList.toggle('open',dOpen);
+  tabMods.classList.toggle('on',mOpen); modPanel.classList.toggle('open',mOpen);
+}
+tabDogs.addEventListener('click',()=>openPanel(dogPanel.classList.contains('open')?null:'dogs'));
+tabMods.addEventListener('click',()=>openPanel(modPanel.classList.contains('open')?null:'mods'));
+addEventListener('resize',()=>{if(modI>=0)drawGLink();});
+layoutDogs(); renderSpec(); openPanel('dogs');
+
+/* ===== PART 5 — AI inspections on the same pinned page =====
+   Four capability groups orbit the dog like satellites; picking one swings it
+   front and pops an iOS-long-press-style quick list; picking an item flanks
+   the dog with a text card (left) and an image card (right). */
+const AI=[
+ {name:{zh:'数据与记录',en:'Data & Records'},subs:[
+  {t:{zh:'数字仪表 OCR',en:'Digital Meter OCR'},img:'assets/ai-digital.jpg',
+   d:{zh:'面向 IDC 机房,机器人沿规划路线采集 UPS 屏、PDU 显示、环境面板与配电柜读数,支持 OCR 识别与阈值比对。',en:'For IDC rooms, the robot captures UPS screens, PDU displays, environmental panels, and power cabinet readings along planned routes, with OCR recognition and threshold comparison.'},
+   k:[{zh:'数字显示读数',en:'Digital display values'},{zh:'UPS 与配电柜读数',en:'UPS and power cabinet readings'},{zh:'超出设定阈值的异常数值',en:'Abnormal values against configured thresholds'}],
+   c:[{zh:'UPS · PDU 屏幕',en:'UPS / PDU screens'},{zh:'OCR 识别',en:'OCR recognition'},{zh:'阈值告警',en:'Threshold alerts'}]},
+  {t:{zh:'状态灯与面板 OCR',en:'Status Light & Panel OCR'},img:'assets/ai-status.jpg',
+   d:{zh:'面向半导体厂务与公用动力区域,采集无传感接口的老旧设备上的状态灯、面板、流量计与屏幕读数。',en:'For semiconductor facilities and utility areas, the robot captures status lights, equipment panels, flow meters, and screen readings on legacy equipment without sensor interfaces.'},
+   k:[{zh:'指示灯状态变化',en:'Indicator light state changes'},{zh:'面板与屏幕数值',en:'Panel and screen values'},{zh:'超出设定范围的表计读数',en:'Meter readings outside configured ranges'}],
+   c:[{zh:'状态灯',en:'Status lights'},{zh:'屏幕读数',en:'Screen readings'},{zh:'老旧设备',en:'Legacy equipment'}]},
+  {t:{zh:'资产盘点',en:'Asset Inventory'},img:'assets/ai-asset.jpg',
+   d:{zh:'采集机柜 QR/RFID 标签、设备标签、序列号与机架位置状态,辅助盘点流程,供人工复核或自动比对。',en:'The robot supports auxiliary rack inventory workflows by capturing QR/RFID tags, device labels, serial numbers, and rack position states for manual review or automated comparison.'},
+   k:[{zh:'机柜 QR 与 RFID 标签采集',en:'Cabinet QR and RFID tag capture'},{zh:'设备序列号 OCR 复核',en:'Device serial number OCR review'},{zh:'机架占用状态比对',en:'Rack position occupancy comparison'}],
+   c:[{zh:'QR / RFID',en:'QR / RFID'},{zh:'序列号 OCR',en:'Serial number OCR'},{zh:'变更核验',en:'Change verification'}]}]},
+ {name:{zh:'资产与设备',en:'Assets & Equipment'},subs:[
+  {t:{zh:'热异常检测',en:'Thermal Anomaly Detection'},img:'assets/ai-thermal.jpg',
+   d:{zh:'热成像上装帮助发现设备、变电站、机房与输送区等资产周边的异常发热,把预警提到更早。',en:'Thermal payloads help operators identify abnormal heat around equipment, substations, facility rooms, conveyor areas, and other assets where early warning matters.'},
+   k:[{zh:'异常热信号',en:'Abnormal heat signatures'},{zh:'设备热点',en:'Equipment hot spots'},{zh:'温度趋势变化',en:'Temperature trend changes'}],
+   c:[{zh:'热成像',en:'Thermal imaging'},{zh:'温度阈值',en:'Temperature thresholds'},{zh:'趋势记录',en:'Trend records'}]},
+  {t:{zh:'模拟表计读数',en:'Analog Gauge Reading'},img:'assets/ai-gauge.jpg',
+   d:{zh:'机器人搭载相机在巡检中拍摄模拟表计,值守人员远程复核读数并沉淀巡检记录,无需人到每个点位。',en:'Robot-mounted cameras capture analog gauges during patrols, letting operators review readings remotely and build inspection records without sending staff to every checkpoint.'},
+   k:[{zh:'规划点位的表计图像',en:'Gauge images at planned inspection points'},{zh:'读数区间或异常可见状态',en:'Reading ranges or abnormal visual states'},{zh:'现场特定仪表状况',en:'Site-specific instrument conditions'}],
+   c:[{zh:'视觉相机',en:'Visual camera'},{zh:'固定点位',en:'Fixed checkpoints'},{zh:'建议现场调优',en:'Site tuning recommended'}]},
+  {t:{zh:'振动与异响趋势',en:'Vibration & Abnormal Sound Trend'},img:'assets/ai-vib.jpg',
+   d:{zh:'面向泵、压缩机、冷机、真空系统等动力设备,结合路线化采集与振动、音频采样,支持趋势复核与早期异常发现。',en:'For pumps, compressors, chillers, vacuum systems, and other utility equipment, route-based capture combines with vibration or audio sampling for trend review and early anomaly discovery.'},
+   k:[{zh:'异常声音模式',en:'Abnormal sound patterns'},{zh:'振动趋势变化',en:'Vibration trend changes'},{zh:'温升与设备状态的组合',en:'Temperature rise combined with equipment state'}],
+   c:[{zh:'泵 · 压缩机',en:'Pumps / compressors'},{zh:'趋势比对',en:'Trend comparison'},{zh:'工单触发',en:'Work-order trigger'}]}]},
+ {name:{zh:'环境监测',en:'Environmental'},subs:[
+  {t:{zh:'多气体与化学品监测',en:'Multi-Gas & Chemical Monitoring'},img:'assets/ai-gas.jpg',
+   d:{zh:'面向 sub-fab、气瓶柜、化学品库与动力路线,移动巡检结合可配置气体传感与现场标定,补足固定监测点之间的盲区。',en:'For sub-fab, gas cabinet, chemical storage, and utility routes, mobile patrol combines configurable gas sensing and site calibration to complement fixed EHS monitoring points.'},
+   k:[{zh:'刻蚀气体 CF4 / SF6 / Cl2 / HBr',en:'Etch gases such as CF4, SF6, Cl2, and HBr'},{zh:'沉积气体 SiH4 / WF6 / NH3 / N2O',en:'Deposition gases such as SiH4, WF6, NH3, and N2O'},{zh:'掺杂气体 PH3 / AsH3 / B2H6 / BF3',en:'Doping gases such as PH3, AsH3, B2H6, and BF3'}],
+   c:[{zh:'气瓶柜路线',en:'Gas cabinet routes'},{zh:'化学品库',en:'Chemical storage'},{zh:'移动盲区检查',en:'Mobile blind-spot check'}]},
+  {t:{zh:'烟雾与火险识别',en:'Smoke & Fire Detection'},img:'assets/ai-fire.jpg',
+   d:{zh:'例行巡逻中识别可见火焰与高风险烟雾,推送告警到巡检平台供值守人员核实。',en:'During routine patrols, the robot identifies visible fire and high-risk smoke conditions, then pushes alerts to the inspection platform for operator verification.'},
+   k:[{zh:'可见火焰',en:'Visible flames'},{zh:'高风险烟雾',en:'High-risk smoke'},{zh:'火险相关异常场景',en:'Fire-related abnormal scenes'}],
+   c:[{zh:'可见光相机',en:'Visible camera'},{zh:'消防安全',en:'Fire safety'},{zh:'实时告警',en:'Real-time alert'}]},
+  {t:{zh:'积水检测',en:'Water Accumulation Detection'},img:'assets/ai-water.jpg',
+   d:{zh:'在室内外巡检路线上识别可见积水与湿滑地面风险,形成路线级风险记录。',en:'Robot patrols support detection of visible water accumulation and slippery ground risks across indoor and outdoor inspection routes.'},
+   k:[{zh:'积水',en:'Standing water'},{zh:'潮湿或湿滑地面',en:'Wet or slippery ground'},{zh:'路线级风险记录',en:'Route-level risk records'}],
+   c:[{zh:'地面风险',en:'Ground risk'},{zh:'仓库',en:'Warehouses'},{zh:'室外路线',en:'Outdoor paths'}]},
+  {t:{zh:'化学品 / 纯水泄漏检测',en:'Chemical / DI Water Leak Detection'},img:'assets/ai-chem.jpg',
+   d:{zh:'面向半导体 sub-fab 与公用动力管廊,沿管路、罐区、洗涤塔与设备外围检查可见的化学品、纯水与废水泄漏风险。',en:'For semiconductor sub-fab and utility corridors, mobile inspection checks visible chemical, pure-water, and wastewater leak risks along pipe routes, tanks, scrubbers, and equipment perimeters.'},
+   k:[{zh:'管路沿线可见液体积聚',en:'Visible liquid accumulation near pipe routes'},{zh:'化学品储存与罐区异常',en:'Chemical storage and tank-area abnormalities'},{zh:'废水与废气处理区风险',en:'Wastewater or exhaust treatment area risks'}],
+   c:[{zh:'化学品管路',en:'Chemical pipes'},{zh:'纯水路线',en:'DI water routes'},{zh:'洗涤塔区域',en:'Scrubber areas'}]}]},
+ {name:{zh:'安全与安防',en:'Safety & Security'},subs:[
+  {t:{zh:'入侵检测',en:'Intrusion Detection'},img:'assets/ai-sec.jpg',
+   d:{zh:'面向受控区域与周界路线,识别进入设定区域的人员并触发告警,供远程核实。',en:'For restricted areas and perimeter routes, robots identify people entering configured zones and trigger alerts for remote verification.'},
+   k:[{zh:'人员进入设定区域',en:'People entering defined areas'},{zh:'周界入侵',en:'Perimeter intrusion'},{zh:'长时间滞留',en:'Long-duration presence'}],
+   c:[{zh:'受控区',en:'Restricted zones'},{zh:'周界巡逻',en:'Perimeter patrol'},{zh:'隐私可配置',en:'Privacy configurable'}]},
+  {t:{zh:'人脸识别',en:'Face Recognition'},img:'assets/ai-face.jpg',
+   d:{zh:'面向门禁化巡检路线,支持人脸档案识别与口罩佩戴检查,按部署地区配置隐私设置与复核流程。',en:'For access-controlled patrol routes, the robot supports face profile recognition and mask-wearing checks, with privacy settings and review workflows configured per deployment region.'},
+   k:[{zh:'已配置的人脸档案',en:'Configured face profiles'},{zh:'要求场景的口罩佩戴状态',en:'Mask-wearing status where required'},{zh:'设定点位的陌生人告警',en:'Unknown person alerts at defined points'}],
+   c:[{zh:'人脸档案',en:'Face profile'},{zh:'口罩检查',en:'Mask check'},{zh:'门禁管控',en:'Access control'}]},
+  {t:{zh:'限制区与 PPE 合规',en:'Restricted-Area & PPE Compliance'},img:'assets/ai-sec.jpg',
+   d:{zh:'面向工厂、园区与公用动力区域,可配置 PPE、限制区进入、访客异常与设备周边不安全行为的 AI 辅助检查。',en:'For factories, campuses, and utility areas, Da Vinci configures AI-assisted checks for PPE, restricted-area entry, visitor anomalies, and unsafe behavior around equipment or perimeter routes.'},
+   k:[{zh:'PPE、口罩、安全帽或防护服异常',en:'PPE, mask, helmet, or protective clothing exceptions'},{zh:'限制区闯入与越界',en:'Restricted-area intrusion and boundary crossing'},{zh:'设备间与周界的不安全行为',en:'Unsafe behavior near equipment rooms or perimeter zones'}],
+   c:[{zh:'PPE 检查',en:'PPE checks'},{zh:'限制区',en:'Restricted areas'},{zh:'人工复核',en:'Human review'}]},
+  {t:{zh:'消防通道占用',en:'Blocked Exit Detection'},img:'assets/ai-exit.jpg',
+   d:{zh:'巡逻走廊与出口,识别被堵塞的疏散路线、杂乱通道或占用安全区域的物品。',en:'Robots patrol corridors and exits to identify blocked evacuation routes, cluttered passageways, or objects occupying designated safety areas.'},
+   k:[{zh:'堵塞出口的物品',en:'Objects blocking exits'},{zh:'杂乱走廊',en:'Cluttered corridors'},{zh:'被占用的疏散路径',en:'Occupied evacuation paths'}],
+   c:[{zh:'消防合规',en:'Fire compliance'},{zh:'走廊',en:'Corridors'},{zh:'定时巡逻',en:'Scheduled patrol'}]},
+  {t:{zh:'违停检测',en:'Illegal Parking Detection'},img:'assets/ai-park.jpg',
+   d:{zh:'面向园区、商业物业与产业园,辅助识别违规停车、非机动车乱停与充电车位占用。',en:'For campuses, commercial properties, and industrial parks, robot patrols help detect illegal parking, non-motor vehicle violations, and misuse of EV charging spaces.'},
+   k:[{zh:'限制区域内的车辆',en:'Vehicles in restricted areas'},{zh:'越界停放的非机动车',en:'Non-motor vehicles outside zones'},{zh:'充电车位滥用',en:'EV charging space misuse'}],
+   c:[{zh:'停车区',en:'Parking Areas'},{zh:'充电车位',en:'EV Spaces'},{zh:'物业运营',en:'Property Operations'}]}]},
+];
+const gStage=document.querySelector('.g-stage');
+const aiMenu=document.getElementById('aiMenu'),aiLeft=document.getElementById('aiLeft'),aiRight=document.getElementById('aiRight'),
+      aiCatLbl=document.getElementById('aiCatLbl'),aiName=document.getElementById('aiName'),aiDesc=document.getElementById('aiDesc'),
+      aiDets=document.getElementById('aiDets'),aiImg=document.getElementById('aiImg'),aiChips=document.getElementById('aiChips'),
+      aiOrbit=document.getElementById('aiOrbit');
+let aiMode=false, aiCat=-1, aiSub=-1, aiMenuOpen=false, orbBase=0, aiLastT=0;
+const orbCur=AI.map((_,i)=>i*(Math.PI/2));
+let orbFrozen=orbCur.slice();
+const orbEls=AI.map((c,i)=>{
+  const b=document.createElement('button');
+  b.className='ai-orb'; b.type='button';
+  b.innerHTML=`<i>0${i+1}</i><span data-en="${c.name.en}">${c.name.zh}</span>`;
+  b.addEventListener('click',e=>{e.stopPropagation();openCat(i);});
+  aiOrbit.appendChild(b); return b;
+});
+function syncOrbSel(){
+  orbEls.forEach((el,k)=>el.classList.toggle('sel',k===aiCat));
+  garageSec.classList.toggle('aipick',aiCat>=0);   // shows the 返回环绕 control
+}
+function buildMenu(i){
+  aiMenu.innerHTML=AI[i].subs.map((s,j)=>`<button type="button" data-j="${j}"><i>${String(j+1).padStart(2,'0')}</i>${L(s.t)}</button>`).join('');
+  [...aiMenu.children].forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();pickSub(+b.dataset.j);}));
+}
+function hideAICards(){aiLeft.classList.remove('on');aiRight.classList.remove('on');gDogWrap.classList.remove('aside');}
+function openCat(i){
+  if(aiCat===i){
+    aiMenuOpen=!aiMenuOpen; aiMenu.classList.toggle('on',aiMenuOpen);
+    if(!aiMenuOpen && aiSub<0){aiCat=-1;syncOrbSel();}
+    return;
+  }
+  aiCat=i; aiSub=-1; hideAICards(); buildMenu(i);
+  aiMenuOpen=true; aiMenu.classList.add('on');
+  orbFrozen=orbCur.slice(); syncOrbSel();
+}
+function pickSub(j){
+  if(aiSub===j){aiSub=-1;hideAICards();aiMenuOpen=false;aiMenu.classList.remove('on');return;}
+  aiSub=j;
+  const c=AI[aiCat], s=c.subs[j];
+  aiCatLbl.textContent=L(c.name)+' · '+String(j+1).padStart(2,'0')+' / '+String(c.subs.length).padStart(2,'0');
+  aiName.textContent=L(s.t); aiDesc.textContent=L(s.d);
+  aiDets.innerHTML=s.k.map(x=>`<li>${L(x)}</li>`).join('');
+  aiImg.src=s.img; aiChips.innerHTML=s.c.map(x=>`<b>${L(x)}</b>`).join('');
+  aiLeft.classList.add('on'); aiRight.classList.add('on'); gDogWrap.classList.add('aside');
+  aiMenuOpen=false; aiMenu.classList.remove('on');
+  [...aiMenu.children].forEach((b,k)=>b.classList.toggle('sel',k===j));
+}
+function closeAI(){aiMenuOpen=false;aiMenu.classList.remove('on');aiSub=-1;hideAICards();aiCat=-1;syncOrbSel();}
+// ✕ on the text card: retract the cards (category stays parked for re-picking)
+document.getElementById('aiX').addEventListener('click',e=>{
+  e.stopPropagation(); aiSub=-1; hideAICards();
+  [...aiMenu.children].forEach(b=>b.classList.remove('sel'));
+});
+// 返回环绕: release the parked group back onto the orbit and resume the spin
+document.getElementById('aiReturn').addEventListener('click',e=>{
+  e.stopPropagation(); closeAI();
+});
+
+/* ===== NAV as a site index: each item scrolls to its chapter =====
+   NOTE: offsetTop here is relative to #site (it is position:relative), so
+   absolute document positions MUST come from getBoundingClientRect+scrollY. */
+document.querySelectorAll('nav a[data-nav]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const abs=el=>scrollY+el.getBoundingClientRect().top;
+    const wr=(w,f)=>abs(w)+(w.offsetHeight-innerHeight)*f;
+    const R=abs(spacer)+spacer.offsetHeight-innerHeight;
+    let y=0;
+    switch(a.dataset.nav){
+      case 'map':    y=R*(0.11+0.89*0.66); break;   // map mid-hold
+      case 'garage': y=wr(garageWrap,0.32); break;  // 机体与上装 page (part 4)
+      case 'ai':     y=wr(garageWrap,0.70); break;  // SOFTWARE · AI 巡检 page (part 5)
+      case 'bento':  y=wr(bentoWrap,0.62); break;   // both bento phases visible
+    }
+    scrollTo({top:Math.round(y),behavior:'smooth'});
+  });
+});
+document.getElementById('logo').addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+
+/* ===== language engine: swaps [data-en]/[data-en-html]/[data-en-ph] and
+   re-renders every dynamic, data-driven piece ===== */
+const langBtn=document.getElementById('langBtn');
+function applyLang(){
+  document.documentElement.lang = LANG==='en'?'en':'zh-CN';
+  document.documentElement.classList.toggle('en', LANG==='en');   // EN type scale
+  document.title = LANG==='en'?'Da Vinci Robotics — Autonomous Inspection Experts':'Da Vinci Robotics — 自主巡检专家';
+  langBtn.textContent = LANG==='en'?'中文':'EN';
+  document.querySelectorAll('[data-en]').forEach(el=>{
+    if(el.dataset.zh===undefined) el.dataset.zh=el.textContent;
+    el.textContent = LANG==='en'?el.dataset.en:el.dataset.zh;
+  });
+  document.querySelectorAll('[data-en-html]').forEach(el=>{
+    if(el.dataset.zhHtml===undefined) el.dataset.zhHtml=el.innerHTML;
+    el.innerHTML = LANG==='en'?el.dataset.enHtml:el.dataset.zhHtml;
+  });
+  document.querySelectorAll('[data-en-ph]').forEach(el=>{
+    if(el.dataset.zhPh===undefined) el.dataset.zhPh=el.getAttribute('placeholder')||'';
+    el.setAttribute('placeholder', LANG==='en'?el.dataset.enPh:el.dataset.zhPh);
+  });
+  splitBeatTitles();          // beat headlines re-split per language
+  renderCard();               // hero carousel
+  renderSpec();               // garage spec card
+  if(modI>=0) renderStage();  // fitted-module card label
+  closeAllMap();              // popups re-fill with L() on next open
+  closeAI();
+}
+langBtn.addEventListener('click',()=>{
+  LANG = LANG==='zh'?'en':'zh';
+  try{sessionStorage.setItem('dvlang',LANG);}catch(e){}
+  applyLang();
+});
+if(LANG==='en') applyLang(); else langBtn.textContent='EN';
+gStage.addEventListener('click',e=>{
+  if(!aiMode||!aiMenuOpen)return;
+  if(!e.target.closest('.ai-menu')&&!e.target.closest('.ai-orb')){
+    aiMenuOpen=false;aiMenu.classList.remove('on');
+    if(aiSub<0){aiCat=-1;syncOrbSel();}
+  }
+});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&aiMode)closeAI();});
+// per-frame engine, called from tick via aiHook
+aiHook=function(gl,t){
+  const on = gl>0.5;
+  if(on!==aiMode){
+    aiMode=on;
+    garageSec.classList.toggle('ai',on);
+    if(on){ if(modI>=0){modI=-1;renderStage();renderSpec();} openPanel(null); }
+    else closeAI();
+  }
+  if(!aiMode||innerWidth<=900)return;
+  const dt=Math.min(0.05,Math.max(0,t-aiLastT)); aiLastT=t;
+  if(aiCat<0) orbBase+=dt*0.32;
+  const W=gStage.clientWidth,H=gStage.clientHeight,cx=W/2,cy=H/2;
+  const RX=Math.min(W*0.62,560), RY=H*0.37;            // wide sweep — buttons may
+  orbEls.forEach((el,i)=>{                             // overhang the stage, fine
+    const target = aiCat<0 ? orbBase+i*(Math.PI/2) : (i===aiCat ? Math.PI/2 : orbFrozen[i]);
+    let d=target-orbCur[i]; d=Math.atan2(Math.sin(d),Math.cos(d));
+    orbCur[i]+= aiCat<0 ? d : d*Math.min(1,dt*8);
+    const th=orbCur[i];
+    const x=cx+Math.cos(th)*RX, y=cy+Math.sin(th)*RY;
+    const dep=(Math.sin(th)+1)/2;                      // 0 behind the dog, 1 in front
+    const sc=(0.74+0.36*dep)*(aiCat>=0&&i!==aiCat?0.92:1);
+    el.style.transform=`translate(-50%,-50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${sc.toFixed(3)})`;
+    el.style.opacity=(aiCat>=0&&i!==aiCat?(aiSub>=0?0.15:0.28):(0.45+0.55*dep)).toFixed(2);
+    el.style.zIndex=dep>0.5?4:0;
+  });
+  if(aiMenuOpen&&aiCat>=0){                            // quick list rides its button
+    const r=orbEls[aiCat].getBoundingClientRect(), sr=gStage.getBoundingClientRect();
+    aiMenu.style.left=(r.left+r.width/2-sr.left).toFixed(1)+'px';
+    aiMenu.style.bottom=(sr.bottom-r.top+10).toFixed(1)+'px';
+  }
+};
+</script>
+</body>
+</html>
